@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Corporativo — Hostal HDQ</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>" />
+  <!-- Verificación temprana: sin parpadeo -->
+  <script src="js/auth.js"></script>
+  <script>AUTH.redirectIfLoggedIn();</script>
+</head>
+<body class="login-page">
+
+<div class="login-container">
+
+  <div class="login-brand">
+    <div class="logo-circle">🏨</div>
+    <h1>HOSTAL HDQ</h1>
+    <p class="subtitle">Chiloé 1130, Sector Collao · Concepción, Chile</p>
+  </div>
+
+  <div class="login-card">
+    <h2>Iniciar Sesión</h2>
+    <p class="welcome-text">Ingresa con tus credenciales.</p>
+
+    <div id="login-alert"></div>
+
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label for="username">Usuario</label>
+        <div class="input-icon-wrap">
+          <span class="icon">👤</span>
+          <input type="text" id="username" class="form-control"
+                 placeholder="tu-usuario" autocomplete="username" spellcheck="false" />
+        </div>
+        <span class="form-error" id="username-error">Ingresa tu usuario.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Contraseña</label>
+        <div class="input-icon-wrap">
+          <span class="icon">🔒</span>
+          <input type="password" id="password" class="form-control"
+                 placeholder="••••••••" autocomplete="current-password" />
+          <button type="button" class="toggle-password" id="toggle-pass">👁️</button>
+        </div>
+        <span class="form-error" id="password-error">Ingresa tu contraseña.</span>
+      </div>
+
+      <div style="margin-top:24px;">
+        <button type="submit" class="btn btn-primary btn-lg" id="btn-login">
+          Ingresar al Portal
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Indicadores de entorno -->
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap;">
+    <div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:8px 14px;
+                color:rgba(255,255,255,0.8);font-size:0.78rem;text-align:center;">
+      <div style="font-size:1rem;">📞</div>
+      <div style="font-weight:700;">Interno HDQ</div>
+      <div style="opacity:0.7;">david / nelson</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:8px 14px;
+                color:rgba(255,255,255,0.8);font-size:0.78rem;text-align:center;">
+      <div style="font-size:1rem;">🌐</div>
+      <div style="font-weight:700;">Portal Web</div>
+      <div style="opacity:0.7;">sei-consultores</div>
+    </div>
+  </div>
+
+  <div class="login-footer">
+    <p>Check-in 15:00 · Check-out 11:00 · david@hostalhdq.cl</p>
+    <p style="margin-top:4px;font-size:0.72rem;opacity:0.6;">
+      © 2026 Hostal HDQ · Portal privado
+    </p>
+  </div>
+</div>
+
+<script>
+  /* auth.js ya cargó en el <head>, no hay que repetirlo */
+
+  /* Toggle password */
+  document.getElementById('toggle-pass').addEventListener('click', function () {
+    const inp = document.getElementById('password');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    this.textContent = inp.type === 'password' ? '👁️' : '🙈';
+  });
+
+  /* Submit */
+  document.getElementById('login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearAlert('login-alert');
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    let valid = true;
+
+    if (!username) {
+      document.getElementById('username').classList.add('error');
+      document.getElementById('username-error').classList.add('show');
+      valid = false;
+    } else {
+      document.getElementById('username').classList.remove('error');
+      document.getElementById('username-error').classList.remove('show');
+    }
+    if (!password) {
+      document.getElementById('password').classList.add('error');
+      document.getElementById('password-error').classList.add('show');
+      valid = false;
+    } else {
+      document.getElementById('password').classList.remove('error');
+      document.getElementById('password-error').classList.remove('show');
+    }
+    if (!valid) return;
+
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Verificando...';
+
+    setTimeout(() => {
+      const result = AUTH.login(username, password);
+      if (result.success) {
+        btn.innerHTML = '✅ Acceso concedido...';
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 400);
+      } else {
+        showAlert('login-alert', 'error', result.error || 'Credenciales incorrectas.');
+        btn.disabled = false;
+        btn.innerHTML = 'Ingresar al Portal';
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+      }
+    }, 500);
+  });
+</script>
+</body>
+</html>

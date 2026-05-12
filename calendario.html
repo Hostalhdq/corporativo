@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es" style="visibility:hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendario — Hostal HDQ</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>" />
+  <script src="js/auth.js"></script>
+  <script src="js/sheets.js"></script>
+  <script>AUTH.requireAuth(['owner','staff','web']);</script>
+  <style>
+    /* ── Calendario Semanal ── */
+    .cal-wrapper {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      background: #fff;
+    }
+    .cal-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.82rem;
+    }
+    .cal-table thead tr th {
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 4px;
+      text-align: center;
+      font-weight: 700;
+      white-space: nowrap;
+      border-right: 1px solid rgba(255,255,255,0.15);
+    }
+    .cal-table thead th.th-room {
+      min-width: 120px;
+      text-align: left;
+      padding-left: 14px;
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      background: var(--primary);
+    }
+    .cal-table thead th.th-day {
+      min-width: 110px;
+      font-size: 0.82rem;
+      line-height: 1.3;
+    }
+    .cal-table thead th.th-day .weekday {
+      font-size: 0.68rem;
+      font-weight: 400;
+      opacity: 0.8;
+      display: block;
+    }
+    .cal-table thead th.th-day.today-col { background: #2d5f9e; }
+    .cal-table thead th.weekend-col { background: #162e4a; }
+
+    /* Filas */
+    .cal-table tbody tr { border-bottom: 1px solid #e5e7eb; }
+    .cal-table tbody tr:hover { background: #f8fafc; }
+    .cal-table tbody td.td-room {
+      position: sticky;
+      left: 0;
+      z-index: 10;
+      background: #fff;
+      border-right: 2px solid var(--border);
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    .cal-table tbody tr:hover td.td-room { background: #f8fafc; }
+    .room-label-num  { font-weight: 800; color: var(--primary); font-size: 0.9rem; }
+    .room-label-tipo { font-size: 0.7rem; color: var(--text-muted); }
+
+    /* Celdas */
+    .cal-table tbody td.td-day {
+      padding: 3px 2px;
+      text-align: center;
+      position: relative;
+      min-width: 110px;
+      height: 46px;
+      border-right: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    .cal-table tbody td.td-day.today-col { background: #f0f5ff !important; }
+    .cal-table tbody td.td-day.weekend-col { background: #fafafa; }
+
+    /* Barra */
+    .cal-bar {
+      display: block;
+      height: 30px;
+      border-radius: 0;
+      position: relative;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .cal-bar:hover { filter: brightness(0.88); }
+    .bar-pend { background: #fde68a; border-top: 2px solid #f59e0b; border-bottom: 2px solid #f59e0b; }
+    .bar-conf { background: #bfdbfe; border-top: 2px solid #3b82f6; border-bottom: 2px solid #3b82f6; }
+    .bar-start { border-left: 3px solid; border-radius: 8px 0 0 8px; margin-left: 3px; }
+    .bar-end   { border-right: 3px solid; border-radius: 0 8px 8px 0; margin-right: 3px; }
+    .bar-solo  { border-left: 3px solid; border-right: 3px solid; border-radius: 8px; margin: 0 3px; }
+    .bar-pend.bar-start, .bar-pend.bar-solo { border-left-color: #f59e0b; }
+    .bar-pend.bar-end,   .bar-pend.bar-solo { border-right-color: #f59e0b; }
+    .bar-conf.bar-start, .bar-conf.bar-solo { border-left-color: #3b82f6; }
+    .bar-conf.bar-end,   .bar-conf.bar-solo { border-right-color: #3b82f6; }
+
+    .bar-label {
+      position: absolute;
+      top: 50%; left: 8px;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 95px;
+      color: #1e3a5f;
+      pointer-events: none;
+    }
+    .bar-conf .bar-label { color: #1e3a8a; }
+
+    /* Filas de pie (ocupación e ingresos) */
+    .tr-footer td {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 7px 4px;
+      border-right: 1px solid #e5e7eb;
+    }
+    .tr-footer td.td-room {
+      text-align: left;
+      padding-left: 10px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #f0f4f8 !important;
+      color: var(--text-muted);
+      border-right: 2px solid var(--border);
+    }
+    .occ-high { color: #b91c1c; background: #fef2f2; }
+    .occ-mid  { color: #b45309; background: #fffbeb; }
+    .occ-low  { color: #166534; background: #f0fdf4; }
+    .ing-cell { color: #065f46; background: #f0fdf4; }
+    .ing-zero { color: var(--text-muted); background: #fafafa; }
+
+    /* KPIs semanales */
+    .kpi-semana {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .kpi-s {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--accent);
+    }
+    .kpi-s .kval { font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+    .kpi-s .klbl { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+
+    /* Nav semana */
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .cal-nav h2 {
+      font-size: 1.15rem;
+      color: var(--primary);
+      flex: 1;
+      text-align: center;
+      min-width: 240px;
+    }
+    .btn-mes {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 700;
+      transition: background var(--transition);
+      white-space: nowrap;
+    }
+    .btn-mes:hover { background: var(--primary-light); }
+
+    /* Leyenda */
+    .cal-legend {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .cal-legend-item { display: flex; align-items: center; gap: 7px; }
+    .cal-legend-dot { width: 22px; height: 14px; border-radius: 3px; border: 2px solid; }
+    .ld-avail { background: #dcfce7; border-color: #4ade80; }
+    .ld-pend  { background: #fde68a; border-color: #f59e0b; }
+    .ld-conf  { background: #bfdbfe; border-color: #3b82f6; }
+    .ld-today { background: #f0f5ff; border-color: #2d5f9e; }
+
+    /* Modal */
+    .modal-detalle { max-width: 480px; text-align: left; }
+    .detalle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+    }
+    .detalle-row:last-child { border-bottom: none; }
+    .detalle-row .dk { color: var(--text-muted); font-size: 0.82rem; }
+    .detalle-row .dv { font-weight: 600; }
+    .detalle-habs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .detalle-hab-chip {
+      background: var(--accent-light); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 10px; font-size: 0.82rem;
+      font-weight: 700; color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">🏨 HDQ</div>
+      <div class="client-name" id="sidebar-username">…</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-avatar">👤</div>
+        <div class="user-details">
+          <div class="name" id="sidebar-username-footer">…</div>
+          <div class="role" id="sidebar-role">…</div>
+        </div>
+      </div>
+      <button class="btn-logout" id="btn-logout">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="topbar-title">Calendario Semanal</span>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbar-date"></span>
+        <button class="btn btn-outline btn-sm" onclick="irHoy()">📍 Esta semana</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- Navegación semanal -->
+      <div class="cal-nav">
+        <button class="btn-mes" onclick="cambiarSemana(-1)">◀ Anterior</button>
+        <h2 id="cal-titulo">Cargando...</h2>
+        <button class="btn-mes" onclick="cambiarSemana(+1)">Siguiente ▶</button>
+      </div>
+
+      <!-- KPIs de la semana -->
+      <div class="kpi-semana" id="kpi-semana" style="display:none;"></div>
+
+      <!-- Leyenda -->
+      <div class="cal-legend" style="margin-bottom:14px;">
+        <div class="cal-legend-item">
+          <div class="cal-legend-dot ld-avail"></div> Disponible
+        </div>
+        <div class="cal-legend-item">
+          <div class="cal-legend-dot ld-pend"></div> Pendiente
+        </div>
+        <div class="cal-legend-item">
+          <div class="cal-legend-dot ld-conf"></div> Confirmada
+        </div>
+        <div class="cal-legend-item">
+          <div class="cal-legend-dot ld-today"></div> Hoy
+        </div>
+        <span style="margin-left:auto;font-size:0.78rem;color:var(--text-muted);">
+          💡 Clic en la barra para ver detalle
+        </span>
+      </div>
+
+      <!-- Spinner -->
+      <div id="cal-loading" style="text-align:center;padding:60px;color:var(--text-muted);">
+        <div class="spinner" style="border-color:rgba(30,58,95,0.2);
+             border-top-color:var(--primary);width:30px;height:30px;
+             margin:0 auto 12px;"></div>
+        <p>Cargando reservas...</p>
+      </div>
+
+      <!-- Tabla semanal -->
+      <div class="cal-wrapper" id="cal-wrapper" style="display:none;">
+        <table class="cal-table" id="cal-table"></table>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===== MODAL DETALLE ===== -->
+<div class="modal-overlay" id="modal-detalle">
+  <div class="modal modal-detalle">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <h2 style="margin-bottom:4px;" id="md-id">HDQ-XXXXX</h2>
+        <div id="md-badge"></div>
+      </div>
+      <button onclick="cerrarModal()"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;
+                     color:var(--text-muted);">✕</button>
+    </div>
+
+    <div class="detalle-habs" id="md-habs"></div>
+
+    <div style="margin-top:14px;">
+      <div class="detalle-row">
+        <span class="dk">👤 Huésped</span>
+        <span class="dv" id="md-huesped"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">📅 Check-in</span>
+        <span class="dv" id="md-checkin"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">📅 Check-out</span>
+        <span class="dv" id="md-checkout"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">🌙 Noches</span>
+        <span class="dv" id="md-noches"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">☕ Desayunos/día</span>
+        <span class="dv" id="md-desayunos"></span>
+      </div>
+      <div class="detalle-row" id="md-descuento-row">
+        <span class="dk">🏷️ Descuento</span>
+        <span class="dv" id="md-descuento"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">💰 Total</span>
+        <span class="dv" style="font-size:1.1rem;color:var(--primary);" id="md-total"></span>
+      </div>
+      <div class="detalle-row">
+        <span class="dk">📡 Origen</span>
+        <span class="dv" id="md-origen"></span>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div id="md-acciones" style="display:none;margin-top:20px;gap:10px;flex-wrap:wrap;">
+      <button id="md-btn-confirmar" class="btn btn-sm"
+              style="background:var(--success);color:#fff;">✅ Confirmar</button>
+      <button id="md-btn-cancelar" class="btn btn-sm btn-danger">❌ Cancelar</button>
+    </div>
+
+    <div style="margin-top:16px;text-align:center;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/reservas.js"></script>
+<script>
+/* ================================================
+   ESTADO GLOBAL
+   ================================================ */
+const session = AUTH.getSession();
+const role    = session?.role || 'web';
+let   lunesActual   = getLunes(new Date());
+let   todasReservas = [];
+
+const DIAS_NOMBRE = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MESES_NOMBRE = ['enero','febrero','marzo','abril','mayo','junio',
+                      'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+/* ================================================
+   SIDEBAR
+   ================================================ */
+const navBase = `
+  <div class="nav-section">Menú</div>
+  <a href="dashboard.html" class="nav-item" data-page="dashboard">
+    <span class="nav-icon">📊</span> Dashboard</a>
+  <a href="reservar.html" class="nav-item" data-page="reservar">
+    <span class="nav-icon">📅</span> Nueva Reserva</a>
+  <a href="calendario.html" class="nav-item active" data-page="calendario">
+    <span class="nav-icon">🗓️</span> Calendario</a>`;
+
+const navAdmin = role === 'owner'
+  ? `<div class="nav-section" style="margin-top:12px;">Admin</div>
+     <a href="admin.html" class="nav-item" data-page="admin">
+       <span class="nav-icon">🔧</span> Panel Admin</a>` : '';
+
+document.getElementById('sidebar-nav').innerHTML = navBase + navAdmin;
+const avatarMap = { owner:'👑', staff:'📞', web:'🏢' };
+document.getElementById('sidebar-avatar').textContent = avatarMap[role] || '👤';
+initLayout('calendario');
+
+/* ================================================
+   UTILIDADES DE FECHA
+   ================================================ */
+function getLunes(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day === 0) ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
+
+function getDiasSemana(lunes) {
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(lunes);
+    d.setDate(d.getDate() + i);
+    d.setHours(12, 0, 0, 0);
+    dias.push(d);
+  }
+  return dias;
+}
+
+function tituloSemana(dias) {
+  const d1 = dias[0], d7 = dias[6];
+  const mismoMes = d1.getMonth() === d7.getMonth();
+  const mismoAnio = d1.getFullYear() === d7.getFullYear();
+  if (mismoMes) {
+    return `${d1.getDate()} – ${d7.getDate()} de ${MESES_NOMBRE[d1.getMonth()]} ${d1.getFullYear()}`;
+  } else if (mismoAnio) {
+    return `${d1.getDate()} ${MESES_NOMBRE[d1.getMonth()]} – ${d7.getDate()} ${MESES_NOMBRE[d7.getMonth()]} ${d7.getFullYear()}`;
+  } else {
+    return `${d1.getDate()} ${MESES_NOMBRE[d1.getMonth()]} ${d1.getFullYear()} – ${d7.getDate()} ${MESES_NOMBRE[d7.getMonth()]} ${d7.getFullYear()}`;
+  }
+}
+
+/* ================================================
+   MAPA DE OCUPACIÓN SEMANAL
+   ================================================ */
+function buildWeekMap(lunes, reservas) {
+  const dias = getDiasSemana(lunes);
+  const map  = {};
+  Object.keys(HABITACIONES).forEach(n => { map[n] = {}; });
+
+  reservas.filter(r => r.estado !== 'cancelada').forEach(r => {
+    if (!r.checkin || !r.checkout) return;
+    const ci = new Date(r.checkin  + 'T12:00:00');
+    const co = new Date(r.checkout + 'T12:00:00');
+
+    (r.habitaciones || []).forEach(h => {
+      const num = String(h.numero);
+      if (!map[num]) return;
+
+      dias.forEach((dia, i) => {
+        if (dia >= ci && dia < co) {
+          const sig = new Date(dia);
+          sig.setDate(dia.getDate() + 1);
+          map[num][i] = {
+            reservaId:    r.id,
+            estado:       r.estado,
+            isStart:      dia.toDateString() === ci.toDateString(),
+            isEnd:        sig.toDateString() === co.toDateString(),
+            checkin:      r.checkin,
+            checkout:     r.checkout,
+            noches:       r.noches,
+            total:        r.total,
+            origen:       r.origen || 'Web',
+            huesped:      r.huesped_nombre || '—',
+            desayunos:    r.desayunos?.cantidad || 0,
+            descuento_monto: r.descuento_monto || 0,
+            habitaciones: r.habitaciones || []
+          };
+        }
+      });
+    });
+  });
+
+  return { map, dias };
+}
+
+/* ================================================
+   KPIs POR DÍA
+   ================================================ */
+function calcKPIs(map, dias) {
+  const totalHabs = Object.keys(HABITACIONES).length;
+
+  const porDia = dias.map((_, i) => {
+    const ocupadas = Object.keys(HABITACIONES).filter(n => map[n][i]).length;
+    // Ingresos: precio de habitación × día (solo confirmadas)
+    const ingresos = Object.keys(HABITACIONES).reduce((s, n) => {
+      if (map[n][i] && map[n][i].estado === 'confirmada') {
+        return s + (HABITACIONES[n].precio || 0);
+      }
+      return s;
+    }, 0);
+    return {
+      ocupadas,
+      ingresos,
+      tasa: Math.round(ocupadas / totalHabs * 100)
+    };
+  });
+
+  const tasaSemana    = Math.round(porDia.reduce((s, d) => s + d.tasa, 0) / 7);
+  const ingresosSem   = porDia.reduce((s, d) => s + d.ingresos, 0);
+  const maxOcupadas   = Math.max(...porDia.map(d => d.ocupadas), 0);
+
+  return { porDia, tasaSemana, ingresosSem, maxOcupadas, totalHabs };
+}
+
+/* ================================================
+   RENDERIZAR CALENDARIO
+   ================================================ */
+function renderCalendario(lunes) {
+  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  const { map, dias } = buildWeekMap(lunes, todasReservas);
+  const kpis = calcKPIs(map, dias);
+
+  /* ── Título ── */
+  document.getElementById('cal-titulo').textContent = 'Semana del ' + tituloSemana(dias);
+
+  /* ── KPIs ── */
+  const kpiEl = document.getElementById('kpi-semana');
+  kpiEl.style.display = 'grid';
+  kpiEl.innerHTML = `
+    <div class="kpi-s">
+      <div class="kval">${kpis.tasaSemana}%</div>
+      <div class="klbl">📊 Tasa de ocupación promedio</div>
+    </div>
+    <div class="kpi-s" style="border-left-color:#10b981;">
+      <div class="kval">${formatCLP(kpis.ingresosSem)}</div>
+      <div class="klbl">💰 Ingresos confirmados</div>
+    </div>
+    <div class="kpi-s" style="border-left-color:#f59e0b;">
+      <div class="kval">${kpis.maxOcupadas}/${kpis.totalHabs}</div>
+      <div class="klbl">🏨 Máx. habitaciones en un día</div>
+    </div>`;
+
+  /* ── Cabecera días ── */
+  let thDias = '';
+  dias.forEach(dia => {
+    const esHoy    = dia.toDateString() === hoy.toDateString();
+    const diaSem   = dia.getDay();
+    const esFinSem = diaSem === 0 || diaSem === 6;
+    const cls = (esHoy ? ' today-col' : '') + (esFinSem ? ' weekend-col' : '');
+    thDias += `
+      <th class="th-day${cls}">
+        ${dia.getDate()} ${MESES_NOMBRE[dia.getMonth()].substring(0,3).toUpperCase()}
+        <span class="weekday">${DIAS_NOMBRE[diaSem]}</span>
+      </th>`;
+  });
+
+  let html = `
+    <thead>
+      <tr>
+        <th class="th-room">Habitación</th>
+        ${thDias}
+      </tr>
+    </thead><tbody>`;
+
+  /* ── Filas por piso ── */
+  const pisos = [
+    { label:'Primer Piso',  nums:['101','102','103'] },
+    { label:'Segundo Piso', nums:['201','202','203','204','205','206','207'] }
+  ];
+
+  pisos.forEach(piso => {
+    html += `
+      <tr>
+        <td colspan="8"
+            style="background:#f0f4f8;padding:4px 12px;font-size:0.7rem;
+                   font-weight:700;text-transform:uppercase;
+                   letter-spacing:1px;color:var(--text-muted);">
+          🏠 ${piso.label}
+        </td>
+      </tr>`;
+
+    piso.nums.forEach(num => {
+      const h = HABITACIONES[num];
+      if (!h) return;
+      let celdas = '';
+
+      dias.forEach((dia, i) => {
+        const esHoy    = dia.toDateString() === hoy.toDateString();
+        const diaSem   = dia.getDay();
+        const esFinSem = diaSem === 0 || diaSem === 6;
+        const occ      = map[num]?.[i];
+        let cls = 'td-day';
+        if (esHoy)    cls += ' today-col';
+        if (esFinSem) cls += ' weekend-col';
+
+        if (occ) {
+          const isPend = occ.estado === 'pendiente';
+          const barCls = isPend ? 'bar-pend' : 'bar-conf';
+          let posCls   = 'bar-mid';
+          if (occ.isStart && occ.isEnd) posCls = 'bar-solo';
+          else if (occ.isStart)         posCls = 'bar-start';
+          else if (occ.isEnd)           posCls = 'bar-end';
+
+          const label = occ.isStart
+            ? `<span class="bar-label">${occ.noches}n · ${isPend ? '⏳' : '✅'} ${occ.huesped}</span>`
+            : '';
+
+          celdas += `
+            <td class="${cls}">
+              <span class="cal-bar ${barCls} ${posCls}"
+                    onclick="abrirModal('${occ.reservaId}')">
+                ${label}
+              </span>
+            </td>`;
+        } else {
+          celdas += `<td class="${cls}"></td>`;
+        }
+      });
+
+      html += `
+        <tr>
+          <td class="td-room">
+            <div class="room-label-num">Hab. ${num}</div>
+            <div class="room-label-tipo">${h.tipo} · ${formatCLP(h.precio)}</div>
+          </td>
+          ${celdas}
+        </tr>`;
+    });
+  });
+
+  /* ── Fila: Tasa de ocupación ── */
+  const filaTasa = kpis.porDia.map(d => {
+    const cls = d.tasa >= 70 ? 'occ-high' : d.tasa >= 40 ? 'occ-mid' : 'occ-low';
+    return `<td class="${cls}" style="padding:7px 4px;border-right:1px solid #e5e7eb;">
+      <strong>${d.tasa}%</strong><br>
+      <span style="font-size:0.65rem;font-weight:400;">${d.ocupadas}/10</span>
+    </td>`;
+  }).join('');
+
+  html += `
+    <tr class="tr-footer">
+      <td class="td-room">📊 Ocupación</td>
+      ${filaTasa}
+    </tr>`;
+
+  /* ── Fila: Ingresos del día ── */
+  const filaIng = kpis.porDia.map(d => {
+    const cls = d.ingresos > 0 ? 'ing-cell' : 'ing-zero';
+    return `<td class="${cls}" style="padding:6px 4px;border-right:1px solid #e5e7eb;font-size:0.75rem;">
+      ${d.ingresos > 0 ? formatCLP(d.ingresos) : '—'}
+    </td>`;
+  }).join('');
+
+  html += `
+    <tr class="tr-footer">
+      <td class="td-room">💰 Ingresos</td>
+      ${filaIng}
+    </tr>`;
+
+  html += '</tbody>';
+
+  document.getElementById('cal-table').innerHTML = html;
+  document.getElementById('cal-loading').style.display = 'none';
+  document.getElementById('cal-wrapper').style.display  = 'block';
+}
+
+/* ================================================
+   CARGAR DATOS
+   ================================================ */
+async function cargar(lunes) {
+  document.getElementById('cal-loading').style.display = 'block';
+  document.getElementById('cal-wrapper').style.display  = 'none';
+  document.getElementById('kpi-semana').style.display   = 'none';
+
+  const { reservas } = await cargarReservasCloud();
+  todasReservas = reservas;
+  renderCalendario(lunes);
+}
+
+function cambiarSemana(delta) {
+  const d = new Date(lunesActual);
+  d.setDate(d.getDate() + delta * 7);
+  lunesActual = d;
+  cargar(lunesActual);
+}
+
+function irHoy() {
+  lunesActual = getLunes(new Date());
+  cargar(lunesActual);
+}
+
+/* ================================================
+   MODAL
+   ================================================ */
+function abrirModal(rid) {
+  const r = todasReservas.find(x => x.id === rid);
+  if (!r) return;
+
+  document.getElementById('md-id').textContent = r.id;
+
+  const isPend = r.estado === 'pendiente';
+  document.getElementById('md-badge').innerHTML =
+    `<span class="badge ${isPend ? 'badge-pending' : 'badge-confirmed'}">
+      ${isPend ? '⏳ Pendiente confirmación' : '✅ Confirmada'}
+    </span>`;
+
+  document.getElementById('md-habs').innerHTML =
+    (r.habitaciones || []).map(h =>
+      `<span class="detalle-hab-chip">Hab. ${h.numero} — ${h.tipo}</span>`
+    ).join('');
+
+  document.getElementById('md-huesped').textContent  = r.huesped_nombre || '—';
+  document.getElementById('md-checkin').textContent  = formatDate(r.checkin);
+  document.getElementById('md-checkout').textContent = formatDate(r.checkout);
+  document.getElementById('md-noches').textContent   = (r.noches || 0) + ' noche' + (r.noches !== 1 ? 's' : '');
+  document.getElementById('md-desayunos').textContent= (r.desayunos?.cantidad || 0) + ' por día';
+  document.getElementById('md-total').textContent    = formatCLP(r.total);
+  document.getElementById('md-origen').innerHTML     = badgeOrigen(r.origen || 'Web');
+
+  const descEl = document.getElementById('md-descuento-row');
+  if ((r.descuento_monto || 0) > 0) {
+    descEl.style.display = 'flex';
+    document.getElementById('md-descuento').textContent = '− ' + formatCLP(r.descuento_monto);
+  } else {
+    descEl.style.display = 'none';
+  }
+
+  const acEl = document.getElementById('md-acciones');
+  if (role === 'owner' || role === 'staff') {
+    acEl.style.display = 'flex';
+    const btnConf = document.getElementById('md-btn-confirmar');
+    const btnCan  = document.getElementById('md-btn-cancelar');
+    btnConf.style.display = r.estado === 'confirmada' ? 'none' : 'inline-flex';
+    btnCan.style.display  = r.estado === 'cancelada'  ? 'none' : 'inline-flex';
+    btnConf.onclick = () => accionEstado(rid, 'confirmada');
+    btnCan.onclick  = () => accionEstado(rid, 'cancelada');
+  } else {
+    acEl.style.display = 'none';
+  }
+
+  document.getElementById('modal-detalle').classList.add('show');
+}
+
+async function accionEstado(rid, estado) {
+  const lbl = { confirmada:'confirmar', cancelada:'cancelar' };
+  if (!confirm(`¿Deseas ${lbl[estado] || estado} la reserva ${rid}?`)) return;
+  RESERVAS.updateEstado(rid, estado);
+  await SHEETS.updateEstado(rid, estado);
+  cerrarModal();
+  await cargar(lunesActual);
+}
+
+function cerrarModal() {
+  document.getElementById('modal-detalle').classList.remove('show');
+}
+
+document.getElementById('modal-detalle').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
+
+/* ================================================
+   INICIO
+   ================================================ */
+cargar(lunesActual);
+</script>
+</body>
+</html>
