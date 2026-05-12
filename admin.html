@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="es" style="visibility:hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Admin — Hostal HDQ</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>" />
+  <script src="js/auth.js"></script>
+  <script src="js/sheets.js"></script>
+  <script>AUTH.requireAuth('owner');</script>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">🔧 HDQ</div>
+      <div class="client-name">Panel de Administración</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Vistas</div>
+      <a href="#" class="nav-item active" id="nav-resumen"
+         onclick="showView('view-resumen');return false;">
+        <span class="nav-icon">📊</span> Resumen
+      </a>
+      <a href="#" class="nav-item" id="nav-todas"
+         onclick="showView('view-todas');return false;">
+        <span class="nav-icon">📋</span> Todas las Reservas
+      </a>
+      <a href="#" class="nav-item" id="nav-telefono"
+         onclick="showView('view-telefono');return false;">
+        <span class="nav-icon">📞</span> Teléfono
+      </a>
+      <a href="#" class="nav-item" id="nav-web"
+         onclick="showView('view-web');return false;">
+        <span class="nav-icon">🌐</span> Web
+      </a>
+      <a href="#" class="nav-item" id="nav-habitaciones"
+         onclick="showView('view-habitaciones');return false;">
+        <span class="nav-icon">🚪</span> Por Habitación
+      </a>
+      <a href="#" class="nav-item" id="nav-ine"
+         onclick="showView('view-ine');return false;">
+        <span class="nav-icon">📄</span> Informe INE
+      </a>
+      <div class="nav-section" style="margin-top:12px;">Accesos</div>
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">📊</span> Mi Dashboard
+      </a>
+      <a href="reservar.html" class="nav-item">
+        <span class="nav-icon">📞</span> Nueva Reserva
+      </a>
+      <a href="calendario.html" class="nav-item">
+        <span class="nav-icon">🗓️</span> Calendario
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">👑</div>
+        <div class="user-details">
+          <div class="name">David</div>
+          <div class="role">Dueño — Hostal HDQ</div>
+        </div>
+      </div>
+      <button class="btn-logout" id="btn-logout">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="topbar-title" id="topbar-title">Resumen General</span>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbar-date"></span>
+        <button class="btn btn-outline btn-sm" onclick="cargarDatos()">🔄 Actualizar</button>
+        <button class="btn btn-accent btn-sm" onclick="exportarCSV()">📥 CSV</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- ============ VISTA: RESUMEN ============ -->
+      <div id="view-resumen">
+        <div class="page-header">
+          <div>
+            <h1>📊 Resumen General</h1>
+            <p>Estadísticas globales de los 3 entornos.</p>
+          </div>
+        </div>
+
+        <!-- Stats globales -->
+        <div class="stats-grid" id="stats-globales"></div>
+
+        <!-- Stats por origen -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:24px;">
+
+          <!-- David -->
+          <div class="card" style="border-top:4px solid #1e3a5f;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+              <span style="font-size:1.5rem;">👑</span>
+              <div>
+                <h3 style="color:#1e3a5f;">Teléfono — David</h3>
+                <p style="font-size:0.8rem;">Reservas recibidas por llamado (tú)</p>
+              </div>
+            </div>
+            <div id="stats-david"></div>
+          </div>
+
+          <!-- Nelson -->
+          <div class="card" style="border-top:4px solid #6b21a8;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+              <span style="font-size:1.5rem;">📞</span>
+              <div>
+                <h3 style="color:#6b21a8;">Teléfono — Nelson</h3>
+                <p style="font-size:0.8rem;">Reservas registradas por Nelson</p>
+              </div>
+            </div>
+            <div id="stats-nelson"></div>
+          </div>
+
+          <!-- Web -->
+          <div class="card" style="border-top:4px solid #065f46;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+              <span style="font-size:1.5rem;">🌐</span>
+              <div>
+                <h3 style="color:#065f46;">Portal Web</h3>
+                <p style="font-size:0.8rem;">Reservas realizadas online</p>
+              </div>
+            </div>
+            <div id="stats-web"></div>
+          </div>
+        </div>
+
+        <!-- Disponibilidad HOY -->
+        <div class="card" style="margin-bottom:24px;">
+          <div class="card-header"
+               style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <h2>🏠 Disponibilidad de Habitaciones</h2>
+              <p style="font-size:0.85rem;margin-top:2px;">
+                Estado actual · <span id="disp-fecha"></span>
+              </p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="date" id="disp-checkin"  class="form-control"
+                     style="padding:6px 10px;font-size:0.82rem;max-width:140px;" />
+              <span style="font-size:0.82rem;color:var(--text-muted);">→</span>
+              <input type="date" id="disp-checkout" class="form-control"
+                     style="padding:6px 10px;font-size:0.82rem;max-width:140px;" />
+              <button class="btn btn-outline btn-sm"
+                      onclick="consultarDisponibilidad()">🔍 Consultar</button>
+            </div>
+          </div>
+          <div id="admin-disponibilidad-grid"></div>
+        </div>
+
+        <!-- Recientes -->
+        <div class="card">
+          <div class="card-header"
+               style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <h2>📋 Últimas Reservas (todos los orígenes)</h2>
+            </div>
+            <button class="btn btn-outline btn-sm"
+                    onclick="showView('view-todas')">Ver todas →</button>
+          </div>
+          <div id="tabla-recientes"></div>
+        </div>
+      </div>
+
+      <!-- ============ VISTA: TODAS ============ -->
+      <div id="view-todas" style="display:none;">
+        <div class="page-header">
+          <h1>📋 Todas las Reservas</h1>
+        </div>
+        <div class="card" style="margin-bottom:16px;padding:16px 20px;">
+          <div class="filter-bar">
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:4px;">
+                Buscar</label>
+              <input type="text" id="filter-buscar" class="form-control"
+                     placeholder="ID, huésped, email..." oninput="filtrar()"
+                     style="min-width:220px;" />
+            </div>
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:4px;">
+                Estado</label>
+              <select id="filter-estado" class="form-control" onchange="filtrar()">
+                <option value="">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="confirmada">Confirmada</option>
+                <option value="cancelada">Cancelada</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:4px;">
+                Origen</label>
+              <select id="filter-origen" class="form-control" onchange="filtrar()">
+                <option value="">Todos los orígenes</option>
+                <option value="Teléfono-David">📞 David</option>
+                <option value="Teléfono-Nelson">📞 Nelson</option>
+                <option value="Web">🌐 Web</option>
+              </select>
+            </div>
+            <div style="align-self:flex-end;">
+              <button class="btn btn-outline btn-sm" onclick="resetFiltros()">✕ Limpiar</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <p id="contador-todas" style="font-size:0.85rem;color:var(--text-muted);
+             margin-bottom:12px;"></p>
+          <div id="tabla-todas"></div>
+        </div>
+      </div>
+
+      <!-- ============ VISTA: TELÉFONO ============ -->
+      <div id="view-telefono" style="display:none;">
+        <div class="page-header">
+          <h1>📞 Reservas por Teléfono</h1>
+          <p>David + Nelson</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;"
+             class="form-row">
+          <div class="card">
+            <div class="card-header"><h2 style="color:#1e3a5f;">👑 David</h2></div>
+            <div id="tabla-david"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2 style="color:#6b21a8;">📞 Nelson</h2></div>
+            <div id="tabla-nelson"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VISTA: INFORME INE ============ -->
+      <div id="view-ine" style="display:none;">
+
+        <!-- Controles (se ocultan al imprimir) -->
+        <div id="informe-acciones" style="margin-bottom:20px;">
+          <div class="page-header">
+            <div>
+              <h1>📄 Informe Estadístico INE</h1>
+              <p>Encuesta de Alojamiento Turístico · Hostal HDQ</p>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <div id="selector-mes" style="display:flex;gap:8px;align-items:center;">
+                <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">Período:</label>
+                <select id="ine-mes" class="form-control"
+                        style="padding:7px 12px;" onchange="generarInformeINE()">
+                  <option value="1">Enero</option><option value="2">Febrero</option>
+                  <option value="3">Marzo</option><option value="4">Abril</option>
+                  <option value="5">Mayo</option><option value="6">Junio</option>
+                  <option value="7">Julio</option><option value="8">Agosto</option>
+                  <option value="9">Septiembre</option><option value="10">Octubre</option>
+                  <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                </select>
+                <select id="ine-anio" class="form-control"
+                        style="padding:7px 12px;" onchange="generarInformeINE()">
+                  <!-- Se llena con JS -->
+                </select>
+              </div>
+              <button id="btn-imprimir" class="btn btn-primary"
+                      onclick="window.print()">🖨️ Imprimir / PDF</button>
+              <button class="btn btn-outline btn-sm"
+                      onclick="exportarINEcsv()">📥 CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== INFORME (se imprime) ===== -->
+        <div id="informe-ine-contenido">
+          <!-- Se genera con JS -->
+        </div>
+
+      </div>
+
+      <!-- ============ VISTA: POR HABITACIÓN ============ -->
+      <div id="view-habitaciones" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>🚪 Personas por Habitación</h1>
+            <p>Reservas, noches y personas estimadas por habitación.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div id="tabla-habitaciones"></div>
+        </div>
+      </div>
+
+      <!-- ============ VISTA: WEB ============ -->
+      <div id="view-web" style="display:none;">
+        <div class="page-header">
+          <h1>🌐 Reservas Web</h1>
+          <p>Reservas realizadas desde el portal online.</p>
+        </div>
+        <div class="card">
+          <div id="tabla-web"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/reservas.js"></script>
+<script>
+  const session = AUTH.getSession();
+  if (session) {
+    initLayout('admin');
+    document.getElementById('btn-logout')?.addEventListener('click', () => AUTH.logout());
+
+    /* Mobile sidebar */
+    const mt = document.getElementById('menu-toggle');
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('sidebar-overlay');
+    mt?.addEventListener('click', () => { sb.classList.toggle('open'); ov?.classList.toggle('show'); });
+    ov?.addEventListener('click', () => { sb.classList.remove('open'); ov?.classList.remove('show'); });
+
+    /* Fecha en topbar */
+    const dateEl = document.getElementById('topbar-date');
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('es-CL',
+      { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+    let _todas = [];
+
+    function miniStats(reservas) {
+      const total  = reservas.length;
+      const pend   = reservas.filter(r => r.estado === 'pendiente').length;
+      const conf   = reservas.filter(r => r.estado === 'confirmada').length;
+      const ingr   = reservas.filter(r => r.estado !== 'cancelada').reduce((s,r) => s+(r.total||0), 0);
+      return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.88rem;">
+          <div style="background:#f8f9fa;border-radius:6px;padding:8px 10px;">
+            📋 <strong>${total}</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">Total</span>
+          </div>
+          <div style="background:#fef9e7;border-radius:6px;padding:8px 10px;">
+            ⏳ <strong>${pend}</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">Pendientes</span>
+          </div>
+          <div style="background:#eafaf1;border-radius:6px;padding:8px 10px;">
+            ✅ <strong>${conf}</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">Confirmadas</span>
+          </div>
+          <div style="background:#f5eef8;border-radius:6px;padding:8px 10px;">
+            💰 <strong>${formatCLP(ingr)}</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">Ingresos</span>
+          </div>
+        </div>`;
+    }
+
+    window.cambiarEstado = function (id, estado) {
+      const lbl = { confirmada:'confirmar', cancelada:'cancelar', pendiente:'reactivar' };
+      if (!confirm(`¿Deseas ${lbl[estado]||estado} la reserva ${id}?`)) return;
+      RESERVAS.updateEstado(id, estado);
+      cargarDatos();
+    };
+
+    window.cargarDatos = function () {
+      _todas = RESERVAS.getAll();
+      const todas    = [..._todas].reverse();
+      const david    = todas.filter(r => r.origen === 'Teléfono-David'  || r.origen === 'Teléfono');
+      const nelson   = todas.filter(r => r.origen === 'Teléfono-Nelson');
+      const web      = todas.filter(r => r.origen === 'Web');
+
+      /* ── Stats globales ── */
+      const statsG = RESERVAS.getStats();
+      document.getElementById('stats-globales').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-info"><div class="value">${statsG.total}</div><div class="label">Total Reservas</div></div>
+        </div>
+        <div class="stat-card" style="border-left-color:var(--warning);">
+          <div class="stat-icon" style="background:#fef9e7;">⏳</div>
+          <div class="stat-info"><div class="value">${statsG.pendientes}</div><div class="label">Pendientes</div></div>
+        </div>
+        <div class="stat-card" style="border-left-color:var(--success);">
+          <div class="stat-icon" style="background:#eafaf1;">✅</div>
+          <div class="stat-info"><div class="value">${statsG.confirmadas}</div><div class="label">Confirmadas</div></div>
+        </div>
+        <div class="stat-card" style="border-left-color:#e74c3c;">
+          <div class="stat-icon" style="background:#fdedec;">❌</div>
+          <div class="stat-info"><div class="value">${statsG.canceladas}</div><div class="label">Canceladas</div></div>
+        </div>
+        <div class="stat-card" style="border-left-color:#8e44ad;">
+          <div class="stat-icon" style="background:#f5eef8;">💰</div>
+          <div class="stat-info"><div class="value">${formatCLP(statsG.ingresos)}</div><div class="label">Ingresos Totales</div></div>
+        </div>
+        <div class="stat-card" style="border-left-color:#1abc9c;">
+          <div class="stat-icon" style="background:#e8f8f5;">🌙</div>
+          <div class="stat-info"><div class="value">${statsG.noches}</div><div class="label">Noches Totales</div></div>
+        </div>`;
+
+      /* ── Stats por origen ── */
+      document.getElementById('stats-david').innerHTML  = miniStats(david);
+      document.getElementById('stats-nelson').innerHTML = miniStats(nelson);
+      document.getElementById('stats-web').innerHTML    = miniStats(web);
+
+      /* ── Tablas ── */
+      renderReservasTable('tabla-recientes', todas.slice(0, 10),
+        { showOrigen: true, showActions: true });
+
+      renderReservasTable('tabla-todas', todas,
+        { showOrigen: true, showActions: true });
+      document.getElementById('contador-todas').textContent =
+        `${todas.length} reservas en total`;
+
+      renderReservasTable('tabla-david',  david.slice(0, 20),
+        { showOrigen: false, showActions: true });
+      renderReservasTable('tabla-nelson', nelson.slice(0, 20),
+        { showOrigen: false, showActions: true });
+      renderReservasTable('tabla-web',    web,
+        { showOrigen: false, showActions: true });
+    };
+
+    /* ── Filtros vista "Todas" ── */
+    window.filtrar = function () {
+      const texto  = document.getElementById('filter-buscar')?.value.toLowerCase() || '';
+      const estado = document.getElementById('filter-estado')?.value  || '';
+      const origen = document.getElementById('filter-origen')?.value  || '';
+
+      const filtradas = [..._todas].reverse().filter(r => {
+        const mt = !texto  || r.id?.toLowerCase().includes(texto)
+                           || r.huesped_nombre?.toLowerCase().includes(texto)
+                           || r.huesped_email?.toLowerCase().includes(texto);
+        const me = !estado || r.estado === estado;
+        const mo = !origen || r.origen === origen;
+        return mt && me && mo;
+      });
+
+      renderReservasTable('tabla-todas', filtradas, { showOrigen:true, showActions:true });
+      document.getElementById('contador-todas').textContent =
+        `${filtradas.length} de ${_todas.length} reservas`;
+    };
+
+    window.resetFiltros = function () {
+      ['filter-buscar','filter-estado','filter-origen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      filtrar();
+    };
+
+    /* ── Navegación de vistas ── */
+    const VIEWS = ['view-resumen','view-todas','view-telefono','view-habitaciones','view-web','view-ine'];
+    const NAVS  = ['nav-resumen','nav-todas','nav-telefono','nav-habitaciones','nav-web','nav-ine'];
+    const TITLES= {
+      'view-resumen':      'Resumen General',
+      'view-todas':        'Todas las Reservas',
+      'view-telefono':     'Reservas por Teléfono',
+      'view-habitaciones': 'Personas por Habitación',
+      'view-web':          'Reservas Web',
+      'view-ine':          'Informe Estadístico INE'
+    };
+
+    window.showView = function (viewId) {
+      VIEWS.forEach(v => {
+        document.getElementById(v).style.display = v === viewId ? 'block' : 'none';
+      });
+      NAVS.forEach(n => document.getElementById(n)?.classList.remove('active'));
+      const navId = 'nav-' + viewId.replace('view-', '');
+      document.getElementById(navId)?.classList.add('active');
+      document.getElementById('topbar-title').textContent = TITLES[viewId] || '';
+      /* Generar informe INE al abrir la vista */
+      if (viewId === 'view-ine')          generarInformeINE();
+      if (viewId === 'view-habitaciones') generarInformeHabitaciones();
+    };
+
+    /* ── Exportar CSV ── */
+    window.exportarCSV = function () {
+      const all = RESERVAS.getAll();
+      if (!all.length) { alert('No hay reservas para exportar.'); return; }
+
+      const hdr = ['ID','Origen','Registrado por','Cliente','Huésped','Email','Teléfono',
+                   'Check-in','Check-out','Noches','Habitaciones','Desayunos',
+                   'Subtotal Hab','Subtotal Desayunos','Descuento','Total','Estado','Fecha Reserva'];
+      const rows = all.map(r => [
+        r.id, r.origen, r.registrado_por, r.cliente,
+        r.huesped_nombre, r.huesped_email, r.huesped_telefono,
+        r.checkin, r.checkout, r.noches,
+        (r.habitaciones||[]).map(h => `Hab.${h.numero}`).join(' | '),
+        r.desayunos?.cantidad || 0,
+        r.subtotal_habs || 0, r.subtotal_desayunos || 0,
+        r.descuento_monto || 0, r.total, r.estado, r.fecha_reserva
+      ]);
+
+      const csv = [hdr, ...rows].map(row =>
+        row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')
+      ).join('\n');
+
+      const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `reservas_hdq_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    /* ── Personas por habitación ── */
+    window.generarInformeHabitaciones = function () {
+      const reservas = RESERVAS.getAll().filter(r => r.estado !== 'cancelada');
+
+      const stats = {};
+      Object.keys(HABITACIONES).forEach(num => {
+        stats[num] = { reservas: 0, noches: 0, personas: 0, ingresos: 0 };
+      });
+
+      reservas.forEach(r => {
+        (r.habitaciones || []).forEach(h => {
+          const num = String(h.numero);
+          if (!stats[num]) return;
+          const noches = r.noches || 0;
+          stats[num].reservas++;
+          stats[num].noches   += noches;
+          /* Usar personas reales si están registradas, si no usar capacidad de la hab. */
+          const personasReales = r.num_personas || (CAMAS[num] || 2);
+          stats[num].personas += personasReales * noches;
+          stats[num].ingresos += (HABITACIONES[num]?.precio || 0) * noches;
+        });
+      });
+
+      const pisos = [
+        { label:'🏠 Primer Piso',  nums:['101','102','103'] },
+        { label:'🏠 Segundo Piso', nums:['201','202','203','204','205','206','207'] }
+      ];
+
+      let html = `
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Hab.</th>
+                <th>Tipo</th>
+                <th>Capacidad</th>
+                <th style="text-align:center;">Reservas</th>
+                <th style="text-align:center;">Noches</th>
+                <th style="text-align:center;">Personas est.</th>
+                <th style="text-align:right;">Ingresos</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      let totRes = 0, totNoch = 0, totPers = 0, totIng = 0;
+
+      pisos.forEach(piso => {
+        html += `<tr><td colspan="7" style="background:#f0f4f8;font-size:0.72rem;
+                  font-weight:700;text-transform:uppercase;letter-spacing:1px;
+                  color:var(--text-muted);padding:6px 14px;">${piso.label}</td></tr>`;
+
+        piso.nums.forEach(num => {
+          const h = HABITACIONES[num];
+          const s = stats[num];
+          const cap = CAMAS[num] || 2;
+          totRes  += s.reservas;
+          totNoch += s.noches;
+          totPers += s.personas;
+          totIng  += s.ingresos;
+
+          const rowBg = s.reservas === 0 ? 'background:#fafafa;color:#aaa;' : '';
+          html += `
+            <tr style="${rowBg}">
+              <td><strong>Hab. ${num}</strong></td>
+              <td>${h?.tipo || '—'}</td>
+              <td style="text-align:center;">${cap} personas</td>
+              <td style="text-align:center;">
+                <span style="font-weight:700;color:var(--primary);">${s.reservas}</span>
+              </td>
+              <td style="text-align:center;">
+                <span style="font-weight:700;">${s.noches}</span>
+                <span style="font-size:0.75rem;color:var(--text-muted);"> noche${s.noches!==1?'s':''}</span>
+              </td>
+              <td style="text-align:center;">
+                <span style="font-weight:700;color:#065f46;">${s.personas}</span>
+                <span style="font-size:0.75rem;color:var(--text-muted);"> pers.</span>
+              </td>
+              <td style="text-align:right;font-weight:700;color:var(--primary);">
+                ${s.ingresos > 0 ? formatCLP(s.ingresos) : '—'}
+              </td>
+            </tr>`;
+        });
+      });
+
+      html += `
+            <tr style="background:#1e3a5f;color:#fff;font-weight:700;">
+              <td colspan="3" style="padding:10px 14px;">TOTALES</td>
+              <td style="text-align:center;">${totRes}</td>
+              <td style="text-align:center;">${totNoch}</td>
+              <td style="text-align:center;">${totPers}</td>
+              <td style="text-align:right;">${formatCLP(totIng)}</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-top:10px;">
+          * Personas = número ingresado al hacer la reserva × noches.
+          Si no se registró, se usa la capacidad de la habitación.
+          Solo incluye reservas activas (pendientes y confirmadas).
+        </p>`;
+
+      document.getElementById('tabla-habitaciones').innerHTML = html;
+    };
+
+    cargarDatos();
+
+    /* ── Disponibilidad inicial: HOY ── */
+    const hoy      = new Date().toISOString().split('T')[0];
+    const maniana  = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const dispCI   = document.getElementById('disp-checkin');
+    const dispCO   = document.getElementById('disp-checkout');
+    const dispFecha= document.getElementById('disp-fecha');
+    if (dispCI)    dispCI.value  = hoy;
+    if (dispCO)    dispCO.value  = maniana;
+    if (dispFecha) dispFecha.textContent = new Date().toLocaleDateString('es-CL',
+      { weekday:'long', day:'numeric', month:'long' });
+
+    window.consultarDisponibilidad = async function () {
+      const ci = document.getElementById('disp-checkin')?.value;
+      const co = document.getElementById('disp-checkout')?.value;
+      if (!ci || !co || co <= ci) {
+        alert('Selecciona fechas válidas para consultar disponibilidad.');
+        return;
+      }
+      document.getElementById('admin-disponibilidad-grid').innerHTML = `
+        <div style="text-align:center;padding:20px;color:var(--text-muted);">
+          <div class="spinner" style="border-color:rgba(30,58,95,0.2);
+               border-top-color:var(--primary);width:22px;height:22px;
+               margin:0 auto 8px;"></div>
+          <p style="font-size:0.85rem;">Verificando disponibilidad...</p>
+        </div>`;
+
+      const ocupadas = await getOcupacion(ci, co);
+      renderAdminDisponibilidad(ocupadas, ci, co);
+    };
+
+    function renderAdminDisponibilidad(ocupadas, ci, co) {
+      const pisos = {
+        'Primer Piso':  Object.entries(HABITACIONES).filter(([,h]) => h.piso === 1),
+        'Segundo Piso': Object.entries(HABITACIONES).filter(([,h]) => h.piso === 2)
+      };
+      const noches  = Math.round((new Date(co) - new Date(ci)) / 86400000);
+      const nLibres = Object.keys(HABITACIONES).length - ocupadas.size;
+
+      let html = `
+        <div class="disponibilidad-resumen" style="margin-bottom:16px;">
+          <span class="disp-chip disp-chip-libre">🟢 ${nLibres} disponible${nLibres!==1?'s':''}</span>
+          ${[...ocupadas.values()].filter(o=>o.estado==='pendiente').length > 0
+            ? `<span class="disp-chip disp-chip-pending">⏳ ${[...ocupadas.values()].filter(o=>o.estado==='pendiente').length} pendiente${[...ocupadas.values()].filter(o=>o.estado==='pendiente').length!==1?'s':''}</span>` : ''}
+          ${[...ocupadas.values()].filter(o=>o.estado==='confirmada').length > 0
+            ? `<span class="disp-chip disp-chip-occupied">🔴 ${[...ocupadas.values()].filter(o=>o.estado==='confirmada').length} confirmada${[...ocupadas.values()].filter(o=>o.estado==='confirmada').length!==1?'s':''}</span>` : ''}
+          <span style="font-size:0.82rem;color:var(--text-muted);margin-left:4px;">
+            · ${formatDate(ci)} → ${formatDate(co)} (${noches} noche${noches!==1?'s':''})
+          </span>
+        </div>`;
+
+      for (const [piso, habs] of Object.entries(pisos)) {
+        html += `<div class="floor-section">
+          <div class="floor-label">🏠 ${piso}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">`;
+
+        for (const [num, h] of habs) {
+          const occ = ocupadas.get(num);
+          if (occ) {
+            const isPend = occ.estado === 'pendiente';
+            html += `
+              <div style="background:${isPend?'#fffbeb':'#fef2f2'};border:2px solid ${isPend?'#f59e0b':'#ef4444'};
+                          border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.4rem;">${isPend?'⏳':'🔴'}</span>
+                <div>
+                  <div style="font-weight:700;color:${isPend?'#92400e':'#991b1b'};">
+                    Hab. ${num} — ${h.tipo}</div>
+                  <div style="font-size:0.78rem;color:var(--text-muted);">
+                    ${isPend?'Reservada (pendiente)':'Confirmada'}</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
+                    ${formatDate(occ.checkin)} → ${formatDate(occ.checkout)}</div>
+                  <div style="font-size:0.72rem;margin-top:3px;">
+                    <a href="#" onclick="cambiarEstado('${occ.id}','confirmada');return false;"
+                       style="color:var(--success);font-weight:600;margin-right:8px;">✅ Confirmar</a>
+                    <a href="#" onclick="cambiarEstado('${occ.id}','cancelada');return false;"
+                       style="color:var(--danger);font-weight:600;">❌ Cancelar</a>
+                  </div>
+                </div>
+              </div>`;
+          } else {
+            html += `
+              <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:8px;
+                          padding:10px 14px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.4rem;">🟢</span>
+                <div>
+                  <div style="font-weight:700;color:#166534;">Hab. ${num} — ${h.tipo}</div>
+                  <div style="font-size:0.78rem;color:var(--text-muted);">Disponible</div>
+                  <div style="font-size:0.78rem;font-weight:700;color:var(--primary);margin-top:2px;">
+                    ${formatCLP(h.precio)}/noche</div>
+                </div>
+              </div>`;
+          }
+        }
+        html += `</div></div>`;
+      }
+
+      document.getElementById('admin-disponibilidad-grid').innerHTML = html;
+    }
+
+    consultarDisponibilidad();
+
+    /* ================================================
+       INFORME INE
+       ================================================ */
+
+    /* Camas por habitación (capacidad máxima) */
+    const CAMAS = {
+      '101':2, '102':4, '103':2,
+      '201':4, '202':2, '203':2, '204':2, '205':3, '206':4, '207':4
+    };
+    const TOTAL_HABITACIONES = Object.keys(HABITACIONES).length;
+    const TOTAL_CAMAS        = Object.values(CAMAS).reduce((s,c)=>s+c,0);
+
+    const MESES_NOMBRE = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                          'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    /* Llenar selector de años */
+    (function () {
+      const anioEl = document.getElementById('ine-anio');
+      if (!anioEl) return;
+      const anioActual = new Date().getFullYear();
+      for (let a = anioActual; a >= anioActual - 3; a--) {
+        const opt = document.createElement('option');
+        opt.value = a; opt.textContent = a;
+        anioEl.appendChild(opt);
+      }
+      /* Mes actual por defecto */
+      const mesEl = document.getElementById('ine-mes');
+      if (mesEl) mesEl.value = new Date().getMonth() + 1;
+    })();
+
+    window.generarInformeINE = async function () {
+      const mes  = parseInt(document.getElementById('ine-mes')?.value)  || new Date().getMonth()+1;
+      const anio = parseInt(document.getElementById('ine-anio')?.value) || new Date().getFullYear();
+      const contenedor = document.getElementById('informe-ine-contenido');
+      if (!contenedor) return;
+
+      contenedor.innerHTML = `
+        <div style="text-align:center;padding:30px;color:var(--text-muted);">
+          <div class="spinner" style="border-color:rgba(30,58,95,0.2);
+               border-top-color:var(--primary);width:24px;height:24px;
+               margin:0 auto 10px;"></div>
+          <p>Generando informe...</p>
+        </div>`;
+
+      /* Obtener reservas */
+      const { reservas: todas } = await cargarReservasCloud();
+
+      /* Filtrar: check-in dentro del mes, no canceladas */
+      const delMes = todas.filter(r => {
+        if (r.estado === 'cancelada' || !r.checkin) return false;
+        const d = new Date(r.checkin);
+        return d.getMonth() + 1 === mes && d.getFullYear() === anio;
+      });
+
+      /* ── Métricas globales ── */
+      const llegadas        = delMes.length;
+      const pernoctaciones  = delMes.reduce((s,r) => s + (r.noches||0), 0);
+      const habitOcupadas   = delMes.reduce((s,r) => s + (r.habitaciones?.length||0), 0);
+      const habitNochesTotal= delMes.reduce((s,r) => s + (r.noches||0)*(r.habitaciones?.length||0), 0);
+      const ingresosNetos   = delMes.reduce((s,r) => s + (r.subtotal_habs||r.total||0), 0);
+      const ingresosDesayun = delMes.reduce((s,r) => s + (r.subtotal_desayunos||0), 0);
+      const descuentos      = delMes.reduce((s,r) => s + (r.descuento_monto||0), 0);
+      const ingresosTotal   = delMes.reduce((s,r) => s + (r.total||0), 0);
+
+      /* Días del mes */
+      const diasMes         = new Date(anio, mes, 0).getDate();
+      const habDispNoche    = TOTAL_HABITACIONES * diasMes; // hab-noches disponibles
+      const tasaOcupacion   = habDispNoche > 0
+        ? ((habitNochesTotal / habDispNoche) * 100).toFixed(1) : '0.0';
+
+      /* ── Detalle por tipo de habitación ── */
+      const porTipo = {};
+      delMes.forEach(r => {
+        (r.habitaciones||[]).forEach(h => {
+          const key = h.tipo || 'Sin tipo';
+          if (!porTipo[key]) porTipo[key] = { reservas:0, noches:0, ingresos:0 };
+          porTipo[key].reservas++;
+          porTipo[key].noches  += r.noches||0;
+          porTipo[key].ingresos+= (h.precio||0)*(r.noches||0);
+        });
+      });
+
+      /* ── Detalle por habitación (número) ── */
+      const porHab = {};
+      delMes.forEach(r => {
+        (r.habitaciones||[]).forEach(h => {
+          const n = String(h.numero);
+          if (!porHab[n]) porHab[n] = { tipo:h.tipo, reservas:0, noches:0, ingresos:0 };
+          porHab[n].reservas++;
+          porHab[n].noches  += r.noches||0;
+          porHab[n].ingresos+= (h.precio||0)*(r.noches||0);
+        });
+      });
+
+      /* ── Origen ── */
+      const porOrigen = { 'Teléfono':0, 'Web':0 };
+      delMes.forEach(r => {
+        if ((r.origen||'').includes('Teléfono')) porOrigen['Teléfono']++;
+        else porOrigen['Web']++;
+      });
+
+      /* ── Generar HTML del informe ── */
+      const hoy = new Date().toLocaleDateString('es-CL',
+        { day:'2-digit', month:'2-digit', year:'numeric' });
+
+      const filasTipoHTML = Object.entries(porTipo).map(([tipo, d]) => `
+        <tr>
+          <td>${tipo}</td>
+          <td style="text-align:center;">${d.reservas}</td>
+          <td style="text-align:center;">${d.noches}</td>
+          <td style="text-align:right;">${formatCLP(d.ingresos)}</td>
+          <td style="text-align:right;">${d.noches>0?formatCLP(Math.round(d.ingresos/d.noches)):'—'}</td>
+        </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">Sin datos</td></tr>';
+
+      const filasHabHTML = Object.entries(porHab)
+        .sort((a,b)=>Number(a[0])-Number(b[0]))
+        .map(([num, d]) => `
+          <tr>
+            <td style="text-align:center;"><strong>${num}</strong></td>
+            <td>${d.tipo}</td>
+            <td style="text-align:center;">${CAMAS[num]||'—'}</td>
+            <td style="text-align:center;">${d.reservas}</td>
+            <td style="text-align:center;">${d.noches}</td>
+            <td style="text-align:right;">${formatCLP(d.ingresos)}</td>
+          </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#999;">Sin datos</td></tr>';
+
+      /* ── Distribución semanal ── */
+      const semanas = {};
+      const diasNombre = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const porDia = {};
+      diasNombre.forEach(d => { porDia[d] = { llegadas:0, habs:0, noches:0 }; });
+
+      delMes.forEach(r => {
+        if (!r.checkin) return;
+        const fecha  = new Date(r.checkin);
+        const semNum = Math.ceil(fecha.getDate() / 7);
+        const semKey = `Semana ${semNum}`;
+        const dia    = diasNombre[fecha.getDay()];
+        const nHabs  = r.habitaciones?.length || 0;
+        const ingHab = r.subtotal_habs || 0;
+
+        if (!semanas[semKey]) semanas[semKey] = { llegadas:0, habs:0, noches:0, ingresos:0 };
+        semanas[semKey].llegadas++;
+        semanas[semKey].habs    += nHabs;
+        semanas[semKey].noches  += r.noches||0;
+        semanas[semKey].ingresos+= ingHab;
+
+        porDia[dia].llegadas++;
+        porDia[dia].habs   += nHabs;
+        porDia[dia].noches += r.noches||0;
+      });
+
+      const filasSemanasHTML = Object.entries(semanas).map(([sem, d]) => `
+        <tr>
+          <td>${sem}</td>
+          <td style="text-align:center;">${d.llegadas}</td>
+          <td style="text-align:center;">${d.habs}</td>
+          <td style="text-align:center;">${d.noches}</td>
+          <td style="text-align:right;">${formatCLP(d.ingresos)}</td>
+        </tr>`).join('') ||
+        '<tr><td colspan="5" style="text-align:center;color:#999;padding:16px;">Sin llegadas en el período</td></tr>';
+
+      const filasXDiaHTML = diasNombre.map(dia => {
+        const d = porDia[dia];
+        return `
+          <tr>
+            <td>${dia}</td>
+            <td style="text-align:center;">${d.llegadas || '—'}</td>
+            <td style="text-align:center;">${d.habs    || '—'}</td>
+            <td style="text-align:center;">${d.noches  || '—'}</td>
+          </tr>`;
+      }).join('');
+
+      contenedor.innerHTML = `
+        <div class="card" style="margin-bottom:20px;">
+
+          <!-- ENCABEZADO -->
+          <div class="informe-header">
+            <div class="informe-logo-row">
+              <div>
+                <div class="informe-logo">🏨 HOSTAL HDQ</div>
+                <div class="informe-subtitulo">Chiloé 1130, Sector Collao · Concepción, Biobío</div>
+                <div class="informe-subtitulo">david@hostalhdq.cl · RUT: — · Código INE: —</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="informe-periodo">${MESES_NOMBRE[mes]} ${anio}</div>
+                <div class="informe-subtitulo" style="margin-top:6px;">
+                  Encuesta de Alojamiento Turístico (EAT)
+                </div>
+                <div class="informe-subtitulo">Emitido: ${hoy}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CUADRO 1: KPIs principales -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 1 — Resumen del Período</h3>
+            <div class="informe-kpi-grid">
+              <div class="informe-kpi" style="border-left-color:var(--primary);">
+                <div class="kpi-val">${llegadas}</div>
+                <div class="kpi-lbl">Llegadas (huéspedes)</div>
+              </div>
+              <div class="informe-kpi" style="border-left-color:#8e44ad;">
+                <div class="kpi-val">${habitOcupadas}</div>
+                <div class="kpi-lbl">Reservas de habitación</div>
+              </div>
+              <div class="informe-kpi" style="border-left-color:#1abc9c;">
+                <div class="kpi-val">${pernoctaciones}</div>
+                <div class="kpi-lbl">Pernoctaciones (noches totales)</div>
+              </div>
+              <div class="informe-kpi" style="border-left-color:var(--warning);">
+                <div class="kpi-val">${habitNochesTotal}</div>
+                <div class="kpi-lbl">Hab-noches ocupadas</div>
+              </div>
+              <div class="informe-kpi" style="border-left-color:var(--success);">
+                <div class="kpi-val">${tasaOcupacion}%</div>
+                <div class="kpi-lbl">Tasa de ocupación del mes</div>
+              </div>
+              <div class="informe-kpi" style="border-left-color:#e74c3c;">
+                <div class="kpi-val">${TOTAL_HABITACIONES}</div>
+                <div class="kpi-lbl">Habitaciones disponibles</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CUADRO 2: Ingresos -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 2 — Ingresos del Período (CLP)</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Concepto</th>
+                    <th style="text-align:right;">Monto</th>
+                    <th>Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Ingresos por habitaciones</strong></td>
+                    <td style="text-align:right;"><strong>${formatCLP(ingresosNetos)}</strong></td>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">Valor neto alojamiento</td>
+                  </tr>
+                  <tr>
+                    <td>Ingresos por desayunos</td>
+                    <td style="text-align:right;">${formatCLP(ingresosDesayun)}</td>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">Servicio adicional</td>
+                  </tr>
+                  ${descuentos > 0 ? `
+                  <tr style="color:#c0392b;">
+                    <td>Descuentos aplicados</td>
+                    <td style="text-align:right;">− ${formatCLP(descuentos)}</td>
+                    <td style="font-size:0.82rem;">Convenios / promociones</td>
+                  </tr>` : ''}
+                  <tr style="background:var(--accent-light);">
+                    <td><strong>TOTAL INGRESOS PERÍODO</strong></td>
+                    <td style="text-align:right;"><strong style="font-size:1.05rem;">${formatCLP(ingresosTotal)}</strong></td>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">Incluye todos los servicios</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">
+                      Ingreso promedio por llegada</td>
+                    <td style="text-align:right;font-size:0.82rem;color:var(--text-muted);">
+                      ${llegadas > 0 ? formatCLP(Math.round(ingresosNetos/llegadas)) : '—'}</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">
+                      Ingreso promedio por noche</td>
+                    <td style="text-align:right;font-size:0.82rem;color:var(--text-muted);">
+                      ${pernoctaciones > 0 ? formatCLP(Math.round(ingresosNetos/pernoctaciones)) : '—'}</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="informe-nota">* Los ingresos por habitaciones excluyen desayunos y descuentos. Es el valor declarable para la EAT-INE.</p>
+          </div>
+
+          <!-- CUADRO 3: Por tipo de habitación -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 3 — Detalle por Tipo de Habitación</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th style="text-align:center;">Reservas</th>
+                    <th style="text-align:center;">Noches</th>
+                    <th style="text-align:right;">Ingresos</th>
+                    <th style="text-align:right;">Precio prom./noche</th>
+                  </tr>
+                </thead>
+                <tbody>${filasTipoHTML}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CUADRO 4: Por habitación -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 4 — Ocupación por Habitación</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="text-align:center;">N° Hab.</th>
+                    <th>Tipo</th>
+                    <th style="text-align:center;">Camas</th>
+                    <th style="text-align:center;">Reservas</th>
+                    <th style="text-align:center;">Noches</th>
+                    <th style="text-align:right;">Ingresos</th>
+                  </tr>
+                </thead>
+                <tbody>${filasHabHTML}</tbody>
+              </table>
+            </div>
+            <p class="informe-nota">
+              Capacidad total: ${TOTAL_HABITACIONES} habitaciones · ${TOTAL_CAMAS} camas ·
+              Hab-noches disponibles en el mes: ${habDispNoche}
+            </p>
+          </div>
+
+          <!-- CUADRO 5: Canal de reserva -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 5 — Canal de Reserva</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>Canal</th><th style="text-align:center;">Llegadas</th><th style="text-align:center;">%</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>📞 Teléfono (directo)</td>
+                    <td style="text-align:center;">${porOrigen['Teléfono']}</td>
+                    <td style="text-align:center;">
+                      ${llegadas>0?((porOrigen['Teléfono']/llegadas)*100).toFixed(1)+'%':'—'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>🌐 Portal Web</td>
+                    <td style="text-align:center;">${porOrigen['Web']}</td>
+                    <td style="text-align:center;">
+                      ${llegadas>0?((porOrigen['Web']/llegadas)*100).toFixed(1)+'%':'—'}
+                    </td>
+                  </tr>
+                  <tr style="background:var(--accent-light);">
+                    <td><strong>Total</strong></td>
+                    <td style="text-align:center;"><strong>${llegadas}</strong></td>
+                    <td style="text-align:center;"><strong>100%</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CUADRO 6: Distribución semanal -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 6 — Distribución Semanal de Llegadas</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Semana</th>
+                    <th style="text-align:center;">Llegadas</th>
+                    <th style="text-align:center;">Hab. ocupadas</th>
+                    <th style="text-align:center;">Noches</th>
+                    <th style="text-align:right;">Ingresos alojamiento</th>
+                  </tr>
+                </thead>
+                <tbody>${filasSemanasHTML}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CUADRO 7: Resumen día de llegada -->
+          <div class="informe-cuadro">
+            <h3>Cuadro 7 — Llegadas por Día de la Semana</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Día</th>
+                    <th style="text-align:center;">Llegadas</th>
+                    <th style="text-align:center;">Hab. ocupadas</th>
+                    <th style="text-align:center;">Noches</th>
+                  </tr>
+                </thead>
+                <tbody>${filasXDiaHTML}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- FIRMA -->
+          <div class="firma-row">
+            <div class="firma-box">
+              <br>Responsable del establecimiento
+            </div>
+            <div class="firma-box">
+              <br>Cargo
+            </div>
+            <div class="firma-box">
+              <br>Fecha de envío al INE
+            </div>
+          </div>
+
+        </div>`;
+
+      /* Guardar datos para exportación CSV */
+      window._ineData = { mes, anio, delMes, ingresosNetos, ingresosTotal, descuentos };
+    };
+
+    /* Exportar CSV del informe INE */
+    window.exportarINEcsv = function () {
+      const d = window._ineData;
+      if (!d) { alert('Genera el informe primero.'); return; }
+
+      /* Solo cantidades — sin datos personales */
+      const hdr = ['Check-in','Check-out','Noches',
+                   'N° Habitaciones','Tipos de Habitación',
+                   'N° Desayunos','Ingresos Alojamiento',
+                   'Ingresos Desayunos','Descuento','Total','Estado','Canal'];
+
+      const rows = d.delMes.map(r => [
+        r.checkin, r.checkout, r.noches,
+        r.habitaciones?.length || 0,
+        (r.habitaciones||[]).map(h => h.tipo).join(' | '),
+        r.desayunos?.cantidad || 0,
+        r.subtotal_habs       || 0,
+        r.subtotal_desayunos  || 0,
+        r.descuento_monto     || 0,
+        r.total               || 0,
+        r.estado,
+        (r.origen||'').includes('Teléfono') ? 'Teléfono' : 'Web'
+      ]);
+
+      const csv = [hdr, ...rows]
+        .map(row => row.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `INE_HostalHDQ_${MESES_NOMBRE[d.mes]}_${d.anio}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    consultarDisponibilidad();
+  }
+</script>
+</body>
+</html>
