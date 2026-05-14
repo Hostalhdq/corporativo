@@ -37,10 +37,6 @@
          onclick="showView('view-web');return false;">
         <span class="nav-icon">🌐</span> Web
       </a>
-      <a href="#" class="nav-item" id="nav-habitaciones"
-         onclick="showView('view-habitaciones');return false;">
-        <span class="nav-icon">🚪</span> Por Habitación
-      </a>
       <a href="#" class="nav-item" id="nav-ine"
          onclick="showView('view-ine');return false;">
         <span class="nav-icon">📄</span> Informe INE
@@ -282,18 +278,6 @@
 
       </div>
 
-      <!-- ============ VISTA: POR HABITACIÓN ============ -->
-      <div id="view-habitaciones" style="display:none;">
-        <div class="page-header">
-          <div>
-            <h1>🚪 Personas por Habitación</h1>
-            <p>Reservas, noches y personas estimadas por habitación.</p>
-          </div>
-        </div>
-        <div class="card">
-          <div id="tabla-habitaciones"></div>
-        </div>
-      </div>
 
       <!-- ============ VISTA: WEB ============ -->
       <div id="view-web" style="display:none;">
@@ -447,15 +431,14 @@
     };
 
     /* ── Navegación de vistas ── */
-    const VIEWS = ['view-resumen','view-todas','view-telefono','view-habitaciones','view-web','view-ine'];
-    const NAVS  = ['nav-resumen','nav-todas','nav-telefono','nav-habitaciones','nav-web','nav-ine'];
+    const VIEWS = ['view-resumen','view-todas','view-telefono','view-web','view-ine'];
+    const NAVS  = ['nav-resumen','nav-todas','nav-telefono','nav-web','nav-ine'];
     const TITLES= {
-      'view-resumen':      'Resumen General',
-      'view-todas':        'Todas las Reservas',
-      'view-telefono':     'Reservas por Teléfono',
-      'view-habitaciones': 'Personas por Habitación',
-      'view-web':          'Reservas Web',
-      'view-ine':          'Informe Estadístico INE'
+      'view-resumen':   'Resumen General',
+      'view-todas':     'Todas las Reservas',
+      'view-telefono':  'Reservas por Teléfono',
+      'view-web':       'Reservas Web',
+      'view-ine':       'Informe Estadístico INE'
     };
 
     window.showView = function (viewId) {
@@ -467,8 +450,7 @@
       document.getElementById(navId)?.classList.add('active');
       document.getElementById('topbar-title').textContent = TITLES[viewId] || '';
       /* Generar informe INE al abrir la vista */
-      if (viewId === 'view-ine')          generarInformeINE();
-      if (viewId === 'view-habitaciones') generarInformeHabitaciones();
+      if (viewId === 'view-ine') generarInformeINE();
     };
 
     /* ── Exportar CSV ── */

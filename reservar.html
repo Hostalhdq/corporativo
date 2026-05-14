@@ -157,19 +157,29 @@
               <span class="form-error" id="huesped_nombre-error">Ingresa el nombre del huésped.</span>
             </div>
             <div class="form-group">
+              <label for="huesped_rut">RUT <span class="required">*</span></label>
+              <input type="text" id="huesped_rut" class="form-control"
+                     placeholder="12.345.678-9" maxlength="12"
+                     oninput="autoFormatRUT(this)" />
+              <span class="form-error" id="huesped_rut-error">RUT inválido.</span>
+              <span class="form-hint">Formato: 12.345.678-9 · Se valida el dígito verificador.</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
               <label for="huesped_email">Email <span class="required">*</span></label>
               <input type="email" id="huesped_email" class="form-control"
                      placeholder="correo@empresa.cl" />
               <span class="form-error" id="huesped_email-error">Email inválido.</span>
             </div>
-          </div>
-          <div class="form-row">
             <div class="form-group">
               <label for="huesped_telefono">Teléfono <span class="required">*</span></label>
               <input type="tel" id="huesped_telefono" class="form-control"
                      placeholder="+56 9 XXXX XXXX" />
               <span class="form-error" id="huesped_telefono-error">Ingresa un teléfono de contacto.</span>
             </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label>Empresa / Referencia</label>
               <input type="text" id="empresa_ref" class="form-control"
@@ -212,6 +222,7 @@
                 margin:14px 0;text-align:left;font-size:0.88rem;">
       <p><strong>Origen:</strong>      <span id="modal-origen"></span></p>
       <p><strong>Huésped:</strong>     <span id="modal-huesped"></span></p>
+      <p><strong>RUT:</strong>         <span id="modal-rut"></span></p>
       <p><strong>Check-in:</strong>    <span id="modal-checkin"></span></p>
       <p><strong>Check-out:</strong>   <span id="modal-checkout"></span></p>
       <p><strong>Habitaciones:</strong><span id="modal-habs"></span></p>

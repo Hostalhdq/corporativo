@@ -320,6 +320,33 @@ function preFillWebUser(session) {
 }
 
 /* ================================================
+   RUT CHILENO — formato y validación
+   ================================================ */
+function autoFormatRUT(input) {
+  let v = input.value.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (v.length === 0) { input.value = ''; return; }
+  const dv   = v.slice(-1);
+  const body = v.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  input.value = body ? body + '-' + dv : dv;
+}
+
+function validarRUT(rut) {
+  const limpio = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (limpio.length < 2) return false;
+  const body = limpio.slice(0, -1);
+  const dv   = limpio.slice(-1);
+  if (!/^\d+$/.test(body)) return false;
+  let suma = 0, mult = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    suma += parseInt(body[i]) * mult;
+    mult  = mult === 7 ? 2 : mult + 1;
+  }
+  const resto = suma % 11;
+  const dvEsp = resto === 0 ? '0' : resto === 1 ? 'K' : String(11 - resto);
+  return dv === dvEsp;
+}
+
+/* ================================================
    VALIDACIÓN Y ENVÍO
    ================================================ */
 function validateForm() {
@@ -354,6 +381,24 @@ function validateForm() {
     if (!el?.value.trim()) { el?.classList.add('error'); er?.classList.add('show'); valid = false; }
     else                   { el?.classList.remove('error'); er?.classList.remove('show'); }
   });
+
+  /* Validar RUT */
+  const rutEl = document.getElementById('huesped_rut');
+  const rutEr = document.getElementById('huesped_rut-error');
+  if (rutEl) {
+    if (!rutEl.value.trim()) {
+      rutEl.classList.add('error');
+      if (rutEr) { rutEr.textContent = 'Ingresa el RUT del huésped.'; rutEr.classList.add('show'); }
+      valid = false;
+    } else if (!validarRUT(rutEl.value)) {
+      rutEl.classList.add('error');
+      if (rutEr) { rutEr.textContent = 'RUT inválido. Verifica el dígito verificador.'; rutEr.classList.add('show'); }
+      valid = false;
+    } else {
+      rutEl.classList.remove('error');
+      rutEr?.classList.remove('show');
+    }
+  }
 
   const email = document.getElementById('huesped_email');
   if (email?.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
@@ -392,6 +437,7 @@ function submitReserva(e) {
     registrado_por:   session.shortName,
     cliente:          session.displayName,
     huesped_nombre:   document.getElementById('huesped_nombre').value.trim(),
+    huesped_rut:      document.getElementById('huesped_rut')?.value.trim() || '',
     huesped_email:    document.getElementById('huesped_email').value.trim(),
     huesped_telefono: document.getElementById('huesped_telefono').value.trim(),
     checkin, checkout, noches,
@@ -420,22 +466,6 @@ function submitReserva(e) {
 
   setTimeout(() => {
     const id = RESERVAS.save(reserva);
-
-    // --- EmailJS (configurar después) ---
-    // emailjs.send('service_id', 'template_id', {
-    //   to_email: 'david@hostalhdq.cl',
-    //   reserva_id: id,
-    //   origen,
-    //   huesped: reserva.huesped_nombre,
-    //   checkin: formatDate(checkin),
-    //   checkout: formatDate(checkout),
-    //   noches,
-    //   habitaciones: habs.join(', '),
-    //   desayunos: numDesayunos,
-    //   descuento: formatCLP(descuento),
-    //   total: formatCLP(total)
-    // });
-
     showSuccessModal(id, reserva);
     btn.disabled = false;
     btn.innerHTML = '✅ Reserva Enviada';
@@ -445,6 +475,8 @@ function submitReserva(e) {
 function showSuccessModal(id, reserva) {
   document.getElementById('modal-id').textContent       = id;
   document.getElementById('modal-huesped').textContent  = reserva.huesped_nombre;
+  const mrut = document.getElementById('modal-rut');
+  if (mrut) mrut.textContent = reserva.huesped_rut || '—';
   document.getElementById('modal-checkin').textContent  = formatDate(reserva.checkin);
   document.getElementById('modal-checkout').textContent = formatDate(reserva.checkout);
   document.getElementById('modal-habs').textContent     = reserva.habitaciones.map(h => `Hab.${h.numero}`).join(', ');
@@ -515,7 +547,20 @@ const RESERVAS = (() => {
       noches:     all.filter(r => r.estado !== 'cancelada').reduce((s, r) => s + (r.noches || 0), 0)
     };
   }
-  return { getAll, save, updateEstado, remove, getStats };
+  function update(id, newData) {
+    const all = getAll();
+    const i   = all.findIndex(r => r.id === id);
+    if (i < 0) return false;
+    /* Preserva id, estado y fecha original */
+    all[i] = { ...all[i], ...newData, id, estado: all[i].estado, fecha_reserva: all[i].fecha_reserva };
+    localStorage.setItem(KEY, JSON.stringify(all));
+    /* Reenvía a Sheets (crea nueva fila actualizada) */
+    if (typeof SHEETS !== 'undefined') {
+      SHEETS.save({ ...all[i], _editado: true }).catch(() => {});
+    }
+    return true;
+  }
+  return { getAll, save, update, updateEstado, remove, getStats };
 })();
 
 /* ================================================
@@ -547,7 +592,7 @@ function renderReservasTable(containerId, reservas, opts = {}) {
 
     const accionesHtml = showActions
       ? `<td>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
             ${r.estado === 'pendiente'
               ? `<button class="btn btn-sm"
                    style="background:var(--success);color:#fff;padding:4px 8px;"
@@ -568,6 +613,7 @@ function renderReservasTable(containerId, reservas, opts = {}) {
         <td><strong style="font-size:0.85rem;">${r.id}</strong></td>
         ${showOrigen ? `<td>${badgeOrigen(r.origen || 'Web')}</td>` : ''}
         <td>${r.huesped_nombre}<br>
+          <small style="color:var(--text-muted);">${r.huesped_rut || ''}</small><br>
           <small style="color:var(--text-muted);">${r.huesped_email}</small></td>
         <td>${formatDate(r.checkin)}</td>
         <td>${formatDate(r.checkout)}</td>

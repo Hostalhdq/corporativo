@@ -326,6 +326,10 @@
         <span class="dv" id="md-huesped"></span>
       </div>
       <div class="detalle-row">
+        <span class="dk">🪪 RUT</span>
+        <span class="dv" id="md-rut"></span>
+      </div>
+      <div class="detalle-row">
         <span class="dk">📅 Check-in</span>
         <span class="dv" id="md-checkin"></span>
       </div>
@@ -337,6 +341,7 @@
         <span class="dk">🌙 Noches</span>
         <span class="dv" id="md-noches"></span>
       </div>
+
       <div class="detalle-row">
         <span class="dk">☕ Desayunos/día</span>
         <span class="dv" id="md-desayunos"></span>
@@ -590,20 +595,26 @@ function renderCalendario(lunes) {
         const diaSem   = dia.getDay();
         const esFinSem = diaSem === 0 || diaSem === 6;
         const occ      = map[num]?.[i];
+        const prevOcc  = i > 0 ? map[num]?.[i - 1] : null;
         let cls = 'td-day';
         if (esHoy)    cls += ' today-col';
         if (esFinSem) cls += ' weekend-col';
 
         if (occ) {
-          const isPend = occ.estado === 'pendiente';
-          const barCls = isPend ? 'bar-pend' : 'bar-conf';
-          let posCls   = 'bar-mid';
+          const isPend       = occ.estado === 'pendiente';
+          const barCls       = isPend ? 'bar-pend' : 'bar-conf';
+          let posCls         = 'bar-mid';
           if (occ.isStart && occ.isEnd) posCls = 'bar-solo';
           else if (occ.isStart)         posCls = 'bar-start';
           else if (occ.isEnd)           posCls = 'bar-end';
 
-          const label = occ.isStart
-            ? `<span class="bar-label">${occ.noches}n · ${isPend ? '⏳' : '✅'} ${occ.huesped}</span>`
+          /* Mostrar nombre en el primer día visible de la barra
+             (ya sea el check-in real O el primer día de la semana si viene de antes) */
+          const esFirstVisible = occ.isStart || !prevOcc;
+          const label = esFirstVisible
+            ? `<span class="bar-label" style="max-width:100px;">
+                ${isPend ? '⏳' : '✅'} ${occ.huesped}
+               </span>`
             : '';
 
           celdas += `
@@ -711,6 +722,7 @@ function abrirModal(rid) {
     ).join('');
 
   document.getElementById('md-huesped').textContent  = r.huesped_nombre || '—';
+  document.getElementById('md-rut').textContent      = r.huesped_rut    || '—';
   document.getElementById('md-checkin').textContent  = formatDate(r.checkin);
   document.getElementById('md-checkout').textContent = formatDate(r.checkout);
   document.getElementById('md-noches').textContent   = (r.noches || 0) + ' noche' + (r.noches !== 1 ? 's' : '');
