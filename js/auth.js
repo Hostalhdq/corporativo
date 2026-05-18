@@ -116,12 +116,18 @@ function formatCLP(amount) {
 }
 function formatDate(isoStr) {
   if (!isoStr) return '—';
-  return new Date(isoStr).toLocaleDateString('es-CL',
+  /* Forzar hora local para evitar desfase UTC en Chile (UTC-4).
+     '2026-05-13' sin hora se interpreta como UTC midnight → en Chile
+     aparece como May 12 a las 20:00 → día incorrecto.
+     Agregando 'T12:00:00' lo forzamos a mediodía local. */
+  const safe = isoStr.length === 10 ? isoStr + 'T12:00:00' : isoStr;
+  return new Date(safe).toLocaleDateString('es-CL',
     { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function formatDateTime(isoStr) {
   if (!isoStr) return '—';
-  return new Date(isoStr).toLocaleString('es-CL',
+  const safe = isoStr.length === 10 ? isoStr + 'T12:00:00' : isoStr;
+  return new Date(safe).toLocaleString('es-CL',
     { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function showAlert(containerId, type, message) {

@@ -375,22 +375,14 @@ function validateForm() {
     valid = false;
   }
 
-  ['huesped_nombre', 'huesped_email', 'huesped_telefono'].forEach(id => {
-    const el = document.getElementById(id);
-    const er = document.getElementById(id + '-error');
-    if (!el?.value.trim()) { el?.classList.add('error'); er?.classList.add('show'); valid = false; }
-    else                   { el?.classList.remove('error'); er?.classList.remove('show'); }
-  });
+  /* Datos del huésped: ninguno es obligatorio.
+     Solo validamos formato si se ingresó algo. */
 
-  /* Validar RUT */
+  /* RUT: solo valida si se escribió algo */
   const rutEl = document.getElementById('huesped_rut');
   const rutEr = document.getElementById('huesped_rut-error');
-  if (rutEl) {
-    if (!rutEl.value.trim()) {
-      rutEl.classList.add('error');
-      if (rutEr) { rutEr.textContent = 'Ingresa el RUT del huésped.'; rutEr.classList.add('show'); }
-      valid = false;
-    } else if (!validarRUT(rutEl.value)) {
+  if (rutEl && rutEl.value.trim()) {
+    if (!validarRUT(rutEl.value)) {
       rutEl.classList.add('error');
       if (rutEr) { rutEr.textContent = 'RUT inválido. Verifica el dígito verificador.'; rutEr.classList.add('show'); }
       valid = false;
@@ -400,12 +392,15 @@ function validateForm() {
     }
   }
 
+  /* Email: solo valida formato si se escribió algo */
   const email = document.getElementById('huesped_email');
   if (email?.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
     email.classList.add('error');
     const e = document.getElementById('huesped_email-error');
     if (e) { e.textContent = 'Email inválido.'; e.classList.add('show'); }
     valid = false;
+  } else {
+    email?.classList.remove('error');
   }
   return valid;
 }
@@ -436,10 +431,12 @@ function submitReserva(e) {
     origen,
     registrado_por:   session.shortName,
     cliente:          session.displayName,
-    huesped_nombre:   document.getElementById('huesped_nombre').value.trim(),
-    huesped_rut:      document.getElementById('huesped_rut')?.value.trim() || '',
-    huesped_email:    document.getElementById('huesped_email').value.trim(),
-    huesped_telefono: document.getElementById('huesped_telefono').value.trim(),
+    cliente_id:       window._clienteIdSeleccionado || '',
+    huesped_nombre:   document.getElementById('huesped_nombre')?.value.trim()   || '',
+    huesped_rut:      document.getElementById('huesped_rut')?.value.trim()      || '',
+    huesped_email:    document.getElementById('huesped_email')?.value.trim()    || '',
+    huesped_telefono: document.getElementById('huesped_telefono')?.value.trim() || '',
+    huesped_empresa:  document.getElementById('empresa_ref')?.value.trim()      || '',
     checkin, checkout, noches,
     num_personas: numPersonas,
     habitaciones: habs.map(num => ({
@@ -582,6 +579,7 @@ function renderReservasTable(containerId, reservas, opts = {}) {
 
   const showOrigen  = opts.showOrigen  !== false;
   const showActions = opts.showActions === true;
+  const showTotal   = opts.showTotal   !== false;  /* false → oculta montos (staff) */
 
   const rows = reservas.map(r => {
     const habs = Array.isArray(r.habitaciones)
@@ -619,7 +617,7 @@ function renderReservasTable(containerId, reservas, opts = {}) {
         <td>${formatDate(r.checkout)}</td>
         <td style="text-align:center;">${r.noches}</td>
         <td>${habs}</td>
-        <td><strong>${formatCLP(r.total)}</strong></td>
+        ${showTotal ? `<td><strong>${formatCLP(r.total)}</strong></td>` : ''}
         <td><span class="badge badge-${
           r.estado === 'pendiente' ? 'pending' :
           r.estado === 'confirmada' ? 'confirmed' : 'cancelled'}">
@@ -629,6 +627,7 @@ function renderReservasTable(containerId, reservas, opts = {}) {
   }).join('');
 
   const thOrigen  = showOrigen  ? '<th>Origen</th>' : '';
+  const thTotal   = showTotal   ? '<th>Total</th>'  : '';
   const thAccion  = showActions ? '<th>Acciones</th>' : '';
 
   container.innerHTML = `
@@ -638,10 +637,133 @@ function renderReservasTable(containerId, reservas, opts = {}) {
           <tr>
             <th>ID</th>${thOrigen}<th>Huésped</th>
             <th>Check-in</th><th>Check-out</th>
-            <th>Noches</th><th>Hab.</th><th>Total</th><th>Estado</th>${thAccion}
+            <th>Noches</th><th>Hab.</th>${thTotal}<th>Estado</th>${thAccion}
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+}
+
+/* ================================================
+   CLIENTES — CRUD localStorage + Google Sheets
+   Sin campos obligatorios: puede crearse solo con nombre/empresa
+   ================================================ */
+const CLIENTES = (() => {
+  const KEY = 'hdq_clientes';
+
+  function getAll() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  }
+
+  function save(cliente) {
+    const all  = getAll();
+    const id   = 'CLI-' + Date.now().toString(36).toUpperCase();
+    const nuevo = {
+      id,
+      nombre:    cliente.nombre    || '',
+      empresa:   cliente.empresa   || '',
+      rut:       cliente.rut       || '',
+      email:     cliente.email     || '',
+      telefono:  cliente.telefono  || '',
+      notas:     cliente.notas     || '',
+      fecha_registro: new Date().toISOString()
+    };
+    all.push(nuevo);
+    localStorage.setItem(KEY, JSON.stringify(all));
+    if (typeof SHEETS !== 'undefined') {
+      SHEETS.saveCliente(nuevo).catch(() => {});
+    }
+    return id;
+  }
+
+  function update(id, data) {
+    const all = getAll();
+    const idx = all.findIndex(c => c.id === id);
+    if (idx < 0) return false;
+    all[idx] = {
+      ...all[idx], ...data,
+      id,
+      fecha_registro:    all[idx].fecha_registro,
+      fecha_actualizado: new Date().toISOString()
+    };
+    localStorage.setItem(KEY, JSON.stringify(all));
+    if (typeof SHEETS !== 'undefined') {
+      SHEETS.saveCliente(all[idx]).catch(() => {});
+    }
+    /* Actualiza huesped_* en todas las reservas vinculadas */
+    _propagarCambiosCliente(id, all[idx]);
+    return true;
+  }
+
+  function _propagarCambiosCliente(clienteId, c) {
+    const reservas = RESERVAS.getAll();
+    let changed = false;
+    reservas.forEach(r => {
+      if (r.cliente_id !== clienteId) return;
+      if (c.nombre)   { r.huesped_nombre   = c.nombre;   changed = true; }
+      if (c.rut)      { r.huesped_rut      = c.rut;      changed = true; }
+      if (c.email)    { r.huesped_email    = c.email;    changed = true; }
+      if (c.telefono) { r.huesped_telefono = c.telefono; changed = true; }
+    });
+    if (changed) localStorage.setItem('hdq_reservas', JSON.stringify(reservas));
+  }
+
+  function remove(id) {
+    localStorage.setItem(KEY, JSON.stringify(getAll().filter(c => c.id !== id)));
+  }
+
+  /* Buscar por nombre, empresa, RUT o email — devuelve array */
+  function buscar(query) {
+    if (!query || query.trim().length < 1) return [];
+    const q = query.toLowerCase().trim();
+    return getAll().filter(c =>
+      (c.nombre  || '').toLowerCase().includes(q) ||
+      (c.empresa || '').toLowerCase().includes(q) ||
+      (c.rut     || '').toLowerCase().includes(q) ||
+      (c.email   || '').toLowerCase().includes(q)
+    );
+  }
+
+  function getById(id) {
+    return getAll().find(c => c.id === id) || null;
+  }
+
+  return { getAll, save, update, remove, buscar, getById };
+})();
+
+/* ================================================
+   SIDEBAR NAV — función centralizada
+   Genera el nav HTML según rol y página activa
+   ================================================ */
+function buildSidebarNav(role, paginaActiva) {
+  const menuBase = `
+    <div class="nav-section">Menú</div>
+    <a href="dashboard.html"  class="nav-item${paginaActiva==='dashboard'  ?' active':''}" data-page="dashboard">
+      <span class="nav-icon">📊</span> Dashboard</a>
+    <a href="clientes.html"   class="nav-item${paginaActiva==='clientes'   ?' active':''}" data-page="clientes">
+      <span class="nav-icon">👤</span> Clientes</a>
+    <a href="reservar.html"   class="nav-item${paginaActiva==='reservar'   ?' active':''}" data-page="reservar">
+      <span class="nav-icon">📅</span> Nueva Reserva</a>
+    <a href="calendario.html" class="nav-item${paginaActiva==='calendario' ?' active':''}" data-page="calendario">
+      <span class="nav-icon">🗓️</span> Calendario</a>`;
+
+  const menuAdmin = (role === 'owner')
+    ? `<div class="nav-section" style="margin-top:12px;">Administración</div>
+       <a href="admin.html" class="nav-item${paginaActiva==='admin'?' active':''}" data-page="admin">
+         <span class="nav-icon">🔧</span> Panel Admin</a>`
+    : '';
+
+  const menuWeb = `
+    <div class="nav-section">Menú</div>
+    <a href="dashboard.html"  class="nav-item${paginaActiva==='dashboard'  ?' active':''}" data-page="dashboard">
+      <span class="nav-icon">📊</span> Mis Reservas</a>
+    <a href="reservar.html"   class="nav-item${paginaActiva==='reservar'   ?' active':''}" data-page="reservar">
+      <span class="nav-icon">📅</span> Nueva Reserva</a>
+    <a href="calendario.html" class="nav-item${paginaActiva==='calendario' ?' active':''}" data-page="calendario">
+      <span class="nav-icon">🗓️</span> Calendario</a>
+    <div class="nav-section" style="margin-top:12px;">Información</div>
+    <a href="#info-hostal" class="nav-item"><span class="nav-icon">ℹ️</span> Info Hostal</a>`;
+
+  return role === 'web' ? menuWeb : menuBase + menuAdmin;
 }

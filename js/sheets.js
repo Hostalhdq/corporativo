@@ -75,6 +75,23 @@ const SHEETS = {
     }
   },
 
+  /* ── GUARDAR CLIENTE ── */
+  async saveCliente(cliente) {
+    if (!this.isConfigured()) return { ok: false };
+    try {
+      await fetch(SHEETS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({ action: 'saveCliente', cliente })
+      });
+      return { ok: true };
+    } catch (err) {
+      console.warn('[Sheets] Error al guardar cliente:', err);
+      return { ok: false };
+    }
+  },
+
   /* ── VERIFICAR CONEXIÓN ── */
   async ping() {
     if (!this.isConfigured()) return false;

@@ -390,21 +390,7 @@ const MESES_NOMBRE = ['enero','febrero','marzo','abril','mayo','junio',
 /* ================================================
    SIDEBAR
    ================================================ */
-const navBase = `
-  <div class="nav-section">Menú</div>
-  <a href="dashboard.html" class="nav-item" data-page="dashboard">
-    <span class="nav-icon">📊</span> Dashboard</a>
-  <a href="reservar.html" class="nav-item" data-page="reservar">
-    <span class="nav-icon">📅</span> Nueva Reserva</a>
-  <a href="calendario.html" class="nav-item active" data-page="calendario">
-    <span class="nav-icon">🗓️</span> Calendario</a>`;
-
-const navAdmin = role === 'owner'
-  ? `<div class="nav-section" style="margin-top:12px;">Admin</div>
-     <a href="admin.html" class="nav-item" data-page="admin">
-       <span class="nav-icon">🔧</span> Panel Admin</a>` : '';
-
-document.getElementById('sidebar-nav').innerHTML = navBase + navAdmin;
+document.getElementById('sidebar-nav').innerHTML = buildSidebarNav(role, 'calendario');
 const avatarMap = { owner:'👑', staff:'📞', web:'🏢' };
 document.getElementById('sidebar-avatar').textContent = avatarMap[role] || '👤';
 initLayout('calendario');
@@ -412,6 +398,16 @@ initLayout('calendario');
 /* ================================================
    UTILIDADES DE FECHA
    ================================================ */
+
+/* Convierte un objeto Date a string 'YYYY-MM-DD' en hora local
+   (evita desfases de zona horaria al comparar fechas) */
+function toDateStr(d) {
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getLunes(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -455,22 +451,27 @@ function buildWeekMap(lunes, reservas) {
 
   reservas.filter(r => r.estado !== 'cancelada').forEach(r => {
     if (!r.checkin || !r.checkout) return;
-    const ci = new Date(r.checkin  + 'T12:00:00');
-    const co = new Date(r.checkout + 'T12:00:00');
+    /* Tomar solo los 10 primeros chars para manejar strings tipo
+       '2026-05-13T00:00:00Z' que puedan venir de Google Sheets */
+    const ciStr = (r.checkin  || '').slice(0, 10);
+    const coStr = (r.checkout || '').slice(0, 10);
 
     (r.habitaciones || []).forEach(h => {
       const num = String(h.numero);
       if (!map[num]) return;
 
       dias.forEach((dia, i) => {
-        if (dia >= ci && dia < co) {
-          const sig = new Date(dia);
-          sig.setDate(dia.getDate() + 1);
+        const diaStr  = toDateStr(dia);                          // 'YYYY-MM-DD' local
+        const nextDay = new Date(dia);
+        nextDay.setDate(dia.getDate() + 1);
+        const nextStr = toDateStr(nextDay);
+
+        if (diaStr >= ciStr && diaStr < coStr) {
           map[num][i] = {
             reservaId:    r.id,
             estado:       r.estado,
-            isStart:      dia.toDateString() === ci.toDateString(),
-            isEnd:        sig.toDateString() === co.toDateString(),
+            isStart:      diaStr === ciStr,
+            isEnd:        nextStr === coStr,
             checkin:      r.checkin,
             checkout:     r.checkout,
             noches:       r.noches,
@@ -532,15 +533,19 @@ function renderCalendario(lunes) {
   /* ── KPIs ── */
   const kpiEl = document.getElementById('kpi-semana');
   kpiEl.style.display = 'grid';
+  /* KPIs: owner ve ingresos, staff solo ocupación */
+  const kpiIngreso = role === 'owner'
+    ? `<div class="kpi-s" style="border-left-color:#10b981;">
+         <div class="kval">${formatCLP(kpis.ingresosSem)}</div>
+         <div class="klbl">💰 Ingresos confirmados</div>
+       </div>`
+    : '';
   kpiEl.innerHTML = `
     <div class="kpi-s">
       <div class="kval">${kpis.tasaSemana}%</div>
       <div class="klbl">📊 Tasa de ocupación promedio</div>
     </div>
-    <div class="kpi-s" style="border-left-color:#10b981;">
-      <div class="kval">${formatCLP(kpis.ingresosSem)}</div>
-      <div class="klbl">💰 Ingresos confirmados</div>
-    </div>
+    ${kpiIngreso}
     <div class="kpi-s" style="border-left-color:#f59e0b;">
       <div class="kval">${kpis.maxOcupadas}/${kpis.totalHabs}</div>
       <div class="klbl">🏨 Máx. habitaciones en un día</div>
@@ -655,19 +660,20 @@ function renderCalendario(lunes) {
       ${filaTasa}
     </tr>`;
 
-  /* ── Fila: Ingresos del día ── */
-  const filaIng = kpis.porDia.map(d => {
-    const cls = d.ingresos > 0 ? 'ing-cell' : 'ing-zero';
-    return `<td class="${cls}" style="padding:6px 4px;border-right:1px solid #e5e7eb;font-size:0.75rem;">
-      ${d.ingresos > 0 ? formatCLP(d.ingresos) : '—'}
-    </td>`;
-  }).join('');
-
-  html += `
-    <tr class="tr-footer">
-      <td class="td-room">💰 Ingresos</td>
-      ${filaIng}
-    </tr>`;
+  /* ── Fila: Ingresos del día (solo owner) ── */
+  if (role === 'owner') {
+    const filaIng = kpis.porDia.map(d => {
+      const cls = d.ingresos > 0 ? 'ing-cell' : 'ing-zero';
+      return `<td class="${cls}" style="padding:6px 4px;border-right:1px solid #e5e7eb;font-size:0.75rem;">
+        ${d.ingresos > 0 ? formatCLP(d.ingresos) : '—'}
+      </td>`;
+    }).join('');
+    html += `
+      <tr class="tr-footer">
+        <td class="td-room">💰 Ingresos</td>
+        ${filaIng}
+      </tr>`;
+  }
 
   html += '</tbody>';
 

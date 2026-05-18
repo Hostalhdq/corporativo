@@ -37,6 +37,10 @@
          onclick="showView('view-web');return false;">
         <span class="nav-icon">🌐</span> Web
       </a>
+      <a href="#" class="nav-item" id="nav-clientes"
+         onclick="showView('view-clientes');return false;">
+        <span class="nav-icon">👥</span> Clientes
+      </a>
       <a href="#" class="nav-item" id="nav-ine"
          onclick="showView('view-ine');return false;">
         <span class="nav-icon">📄</span> Informe INE
@@ -45,8 +49,11 @@
       <a href="dashboard.html" class="nav-item">
         <span class="nav-icon">📊</span> Mi Dashboard
       </a>
+      <a href="clientes.html" class="nav-item">
+        <span class="nav-icon">👤</span> Clientes
+      </a>
       <a href="reservar.html" class="nav-item">
-        <span class="nav-icon">📞</span> Nueva Reserva
+        <span class="nav-icon">📅</span> Nueva Reserva
       </a>
       <a href="calendario.html" class="nav-item">
         <span class="nav-icon">🗓️</span> Calendario
@@ -279,6 +286,36 @@
       </div>
 
 
+      <!-- ============ VISTA: CLIENTES ============ -->
+      <div id="view-clientes" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>👥 Clientes</h1>
+            <p>Busca un cliente por nombre, RUT o email para ver su historial.</p>
+          </div>
+        </div>
+
+        <!-- Buscador -->
+        <div class="card" style="margin-bottom:16px;padding:16px 20px;">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <div style="flex:1;min-width:220px;">
+              <input type="text" id="cliente-buscar" class="form-control"
+                     placeholder="🔍 Nombre, RUT o email..."
+                     oninput="buscarCliente()" style="font-size:0.95rem;" />
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('cliente-buscar').value='';buscarCliente()">
+              ✕ Limpiar
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de clientes -->
+        <div id="clientes-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px;"></div>
+
+        <!-- Ficha detalle del cliente -->
+        <div id="cliente-ficha" style="display:none;"></div>
+      </div>
+
       <!-- ============ VISTA: WEB ============ -->
       <div id="view-web" style="display:none;">
         <div class="page-header">
@@ -431,12 +468,13 @@
     };
 
     /* ── Navegación de vistas ── */
-    const VIEWS = ['view-resumen','view-todas','view-telefono','view-web','view-ine'];
-    const NAVS  = ['nav-resumen','nav-todas','nav-telefono','nav-web','nav-ine'];
+    const VIEWS = ['view-resumen','view-todas','view-telefono','view-clientes','view-web','view-ine'];
+    const NAVS  = ['nav-resumen','nav-todas','nav-telefono','nav-clientes','nav-web','nav-ine'];
     const TITLES= {
       'view-resumen':   'Resumen General',
       'view-todas':     'Todas las Reservas',
       'view-telefono':  'Reservas por Teléfono',
+      'view-clientes':  'Clientes',
       'view-web':       'Reservas Web',
       'view-ine':       'Informe Estadístico INE'
     };
@@ -450,7 +488,8 @@
       document.getElementById(navId)?.classList.add('active');
       document.getElementById('topbar-title').textContent = TITLES[viewId] || '';
       /* Generar informe INE al abrir la vista */
-      if (viewId === 'view-ine') generarInformeINE();
+      if (viewId === 'view-ine')      generarInformeINE();
+      if (viewId === 'view-clientes') { buscarCliente(); }
     };
 
     /* ── Exportar CSV ── */
@@ -586,6 +625,254 @@
         </p>`;
 
       document.getElementById('tabla-habitaciones').innerHTML = html;
+    };
+
+    /* ================================================
+       CLIENTES
+       ================================================ */
+
+    /* Construye un mapa de clientes únicos desde las reservas */
+    function extraerClientes(reservas) {
+      const map = {};
+      reservas.forEach(r => {
+        const key = (r.huesped_rut || r.huesped_email || r.huesped_nombre || '').toLowerCase().trim();
+        if (!key) return;
+        if (!map[key]) {
+          map[key] = {
+            nombre:   r.huesped_nombre   || '—',
+            rut:      r.huesped_rut      || '',
+            email:    r.huesped_email    || '',
+            telefono: r.huesped_telefono || '',
+            reservas: []
+          };
+        }
+        /* Actualizar con los datos más recientes */
+        if (r.huesped_nombre)   map[key].nombre   = r.huesped_nombre;
+        if (r.huesped_rut)      map[key].rut      = r.huesped_rut;
+        if (r.huesped_email)    map[key].email    = r.huesped_email;
+        if (r.huesped_telefono) map[key].telefono = r.huesped_telefono;
+        map[key].reservas.push(r);
+      });
+      return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+
+    window.buscarCliente = function () {
+      const q = (document.getElementById('cliente-buscar')?.value || '').toLowerCase().trim();
+      const todos = extraerClientes(RESERVAS.getAll());
+      const filtrados = q
+        ? todos.filter(c =>
+            c.nombre.toLowerCase().includes(q) ||
+            c.rut.toLowerCase().includes(q) ||
+            c.email.toLowerCase().includes(q))
+        : todos;
+
+      const listaEl = document.getElementById('clientes-lista');
+      document.getElementById('cliente-ficha').style.display = 'none';
+
+      if (!filtrados.length) {
+        listaEl.innerHTML = `<div style="grid-column:1/-1;padding:30px;text-align:center;
+          color:var(--text-muted);">No se encontraron clientes.</div>`;
+        return;
+      }
+
+      listaEl.innerHTML = filtrados.map((c, i) => {
+        const activas = c.reservas.filter(r => r.estado !== 'cancelada').length;
+        const total   = c.reservas.reduce((s, r) => r.estado !== 'cancelada' ? s + (r.total || 0) : s, 0);
+        return `
+          <div onclick="verCliente(${i})" data-idx="${i}"
+               style="background:#fff;border:2px solid var(--border);border-radius:10px;
+                      padding:16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;"
+               onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--shadow)'"
+               onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <div style="width:38px;height:38px;background:var(--accent-light);border-radius:50%;
+                          display:flex;align-items:center;justify-content:center;
+                          font-size:1.1rem;font-weight:800;color:var(--primary);">
+                ${c.nombre.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style="font-weight:700;color:var(--primary);font-size:0.95rem;">${c.nombre}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">${c.rut || 'Sin RUT'}</div>
+              </div>
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">
+              ${c.email ? '📧 ' + c.email : ''}<br>
+              ${c.telefono ? '📞 ' + c.telefono : ''}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;
+                           padding:2px 10px;font-size:0.75rem;font-weight:700;">
+                ${activas} reserva${activas !== 1 ? 's' : ''}
+              </span>
+              <span style="background:#f0fdf4;color:#166534;border-radius:20px;
+                           padding:2px 10px;font-size:0.75rem;font-weight:700;">
+                ${formatCLP(total)}
+              </span>
+            </div>
+          </div>`;
+      }).join('');
+
+      /* Guardar lista filtrada para verCliente */
+      window._clientesFiltrados = filtrados;
+    };
+
+    window.verCliente = function (idx) {
+      const c = window._clientesFiltrados?.[idx];
+      if (!c) return;
+
+      const fichaEl = document.getElementById('cliente-ficha');
+      const reservasOrden = [...c.reservas].reverse();
+      const activas  = c.reservas.filter(r => r.estado !== 'cancelada');
+      const totalGastado = activas.reduce((s, r) => s + (r.total || 0), 0);
+      const totalNoches  = activas.reduce((s, r) => s + (r.noches || 0), 0);
+
+      fichaEl.style.display = 'block';
+      fichaEl.innerHTML = `
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:52px;height:52px;background:var(--primary);border-radius:50%;
+                          display:flex;align-items:center;justify-content:center;
+                          font-size:1.4rem;font-weight:800;color:#fff;">
+                ${c.nombre.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h2 id="fc-nombre-display" style="margin-bottom:2px;">${c.nombre}</h2>
+                <div style="font-size:0.82rem;color:var(--text-muted);" id="fc-rut-display">
+                  ${c.rut || 'Sin RUT registrado'}
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="toggleEditCliente()">✏️ Editar datos</button>
+          </div>
+
+          <!-- Datos de contacto (vista) -->
+          <div id="fc-datos-vista" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:16px;">
+            <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;">
+              <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px;">🪪 RUT</div>
+              <div style="font-weight:700;">${c.rut || '—'}</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;">
+              <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px;">📧 Email</div>
+              <div style="font-weight:700;">${c.email || '—'}</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;">
+              <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px;">📞 Teléfono</div>
+              <div style="font-weight:700;">${c.telefono || '—'}</div>
+            </div>
+          </div>
+
+          <!-- Formulario edición (oculto por defecto) -->
+          <div id="fc-datos-form" style="display:none;margin-top:16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;">Nombre completo</label>
+                <input type="text" id="fc-edit-nombre" class="form-control" value="${c.nombre}" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;">RUT</label>
+                <input type="text" id="fc-edit-rut" class="form-control" value="${c.rut}"
+                       placeholder="12.345.678-9" maxlength="12"
+                       oninput="autoFormatRUT(this)" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;">Email</label>
+                <input type="email" id="fc-edit-email" class="form-control" value="${c.email}" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;">Teléfono</label>
+                <input type="tel" id="fc-edit-telefono" class="form-control" value="${c.telefono}" />
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px;">
+              <button class="btn btn-primary btn-sm" onclick="guardarDatosCliente()">💾 Guardar cambios</button>
+              <button class="btn btn-outline btn-sm" onclick="toggleEditCliente()">Cancelar</button>
+            </div>
+            <div id="fc-msg" style="margin-top:8px;font-size:0.82rem;display:none;"></div>
+          </div>
+
+          <!-- Resumen stats -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="background:#eff6ff;border-radius:8px;padding:10px 18px;text-align:center;">
+              <div style="font-size:1.3rem;font-weight:800;color:#1d4ed8;">${c.reservas.length}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">Reservas totales</div>
+            </div>
+            <div style="background:#f0fdf4;border-radius:8px;padding:10px 18px;text-align:center;">
+              <div style="font-size:1.3rem;font-weight:800;color:#166534;">${formatCLP(totalGastado)}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">Total gastado</div>
+            </div>
+            <div style="background:#fdf4ff;border-radius:8px;padding:10px 18px;text-align:center;">
+              <div style="font-size:1.3rem;font-weight:800;color:#7e22ce;">${totalNoches}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">Noches en total</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historial de reservas -->
+        <div class="card">
+          <div class="card-header"><h2>📋 Historial de Reservas</h2></div>
+          <div id="fc-reservas-tabla"></div>
+        </div>`;
+
+      /* Guardar referencia al cliente actual para guardar cambios */
+      window._clienteActual = c;
+      window._clienteIdx    = idx;
+
+      /* Renderizar tabla de historial */
+      renderReservasTable('fc-reservas-tabla', reservasOrden,
+        { showOrigen: true, showActions: true });
+
+      /* Scroll hacia la ficha */
+      fichaEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    /* Toggle formulario edición */
+    window.toggleEditCliente = function () {
+      const vista = document.getElementById('fc-datos-vista');
+      const form  = document.getElementById('fc-datos-form');
+      const isOpen = form.style.display !== 'none';
+      vista.style.display = isOpen ? 'grid' : 'none';
+      form.style.display  = isOpen ? 'none' : 'block';
+    };
+
+    /* Guardar cambios del cliente en todas sus reservas */
+    window.guardarDatosCliente = function () {
+      const nombre   = document.getElementById('fc-edit-nombre')?.value.trim();
+      const rut      = document.getElementById('fc-edit-rut')?.value.trim();
+      const email    = document.getElementById('fc-edit-email')?.value.trim();
+      const telefono = document.getElementById('fc-edit-telefono')?.value.trim();
+      const msgEl    = document.getElementById('fc-msg');
+
+      if (!nombre) {
+        msgEl.style.display = 'block'; msgEl.style.color = '#b91c1c';
+        msgEl.textContent = '⚠️ El nombre no puede estar vacío.'; return;
+      }
+
+      const c   = window._clienteActual;
+      const all = RESERVAS.getAll();
+
+      /* Actualizar en todas las reservas del cliente */
+      c.reservas.forEach(r => {
+        const i = all.findIndex(x => x.id === r.id);
+        if (i < 0) return;
+        if (nombre)   all[i].huesped_nombre   = nombre;
+        if (rut)      all[i].huesped_rut      = rut;
+        if (email)    all[i].huesped_email    = email;
+        if (telefono) all[i].huesped_telefono = telefono;
+      });
+
+      localStorage.setItem('hdq_reservas', JSON.stringify(all));
+
+      msgEl.style.display = 'block'; msgEl.style.color = '#166534';
+      msgEl.textContent = '✅ Datos actualizados en ' + c.reservas.length + ' reserva(s).';
+
+      /* Recargar datos y refrescar la ficha */
+      _todas = RESERVAS.getAll();
+      setTimeout(() => {
+        buscarCliente();
+        const nuevoIdx = window._clienteIdx;
+        if (window._clientesFiltrados?.[nuevoIdx]) verCliente(nuevoIdx);
+      }, 600);
     };
 
     cargarDatos();
