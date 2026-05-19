@@ -293,9 +293,9 @@
   </div>
 </div>
 
-<script src="js/auth.js"></script>
 <script src="js/reservas.js"></script>
 <script>
+/* SHEETS_URL viene de sheets.js (cargado en <head>) */
 const session = AUTH.getSession();
 const role    = session?.role || 'staff';
 const avatarMap = { owner:'👑', staff:'📞' };
@@ -541,9 +541,37 @@ function eliminarCliente() {
 }
 
 /* ================================================
-   INICIO
+   INICIO — carga local primero, luego sincroniza Sheets
    ================================================ */
 buscarClientes();
+cargarClientesDesdeSheets();
+
+async function cargarClientesDesdeSheets() {
+  if (!SHEETS.isConfigured()) return;
+  try {
+    const res  = await fetch(SHEETS_URL + '?action=getClientes', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.clientes)) return;
+    if (data.clientes.length === 0) return;
+
+    /* Fusionar: si un cliente de Sheets no está en local, lo agrega */
+    const locales = CLIENTES.getAll();
+    const idsLocales = new Set(locales.map(c => c.id));
+    let nuevos = 0;
+    data.clientes.forEach(c => {
+      if (!idsLocales.has(c.id)) {
+        const all = CLIENTES.getAll();
+        all.push(c);
+        localStorage.setItem('hdq_clientes', JSON.stringify(all));
+        nuevos++;
+      }
+    });
+    if (nuevos > 0) buscarClientes();
+  } catch(e) {
+    console.warn('[Clientes] No se pudo cargar desde Sheets:', e);
+  }
+}
 </script>
 </body>
 </html>
