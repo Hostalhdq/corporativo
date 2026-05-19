@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es" style="visibility:hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clientes — Hostal HDQ</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👤</text></svg>" />
+  <script src="js/auth.js"></script>
+  <script src="js/sheets.js"></script>
+  <script>AUTH.requireAuth(['owner','staff']);</script>
+  <style>
+    /* ── Buscador ── */
+    .cli-search-wrap {
+      position: relative;
+      max-width: 480px;
+    }
+    .cli-search-wrap input {
+      padding-left: 38px;
+    }
+    .cli-search-icon {
+      position: absolute;
+      left: 12px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 1rem;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    /* ── Grid de tarjetas ── */
+    .cli-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .cli-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .cli-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(30,58,95,0.12); }
+    .cli-card-avatar {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.35rem;
+      font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 10px;
+    }
+    .cli-card-nombre { font-weight: 700; font-size: 0.95rem; color: var(--primary); }
+    .cli-card-empresa { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+    .cli-card-datos {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .cli-card-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent-light);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 8px;
+    }
+
+    /* ── Panel lateral (ficha) ── */
+    .cli-panel {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-top: 20px;
+      display: none;
+    }
+    .cli-panel.visible { display: block; }
+    .cli-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .cli-panel-avatar {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.6rem;
+      font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .cli-panel-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
+    .cli-panel-sub   { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Formulario de edición ── */
+    .cli-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 600px) { .cli-form-grid { grid-template-columns: 1fr; } }
+
+    .cli-form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .cli-form-group input,
+    .cli-form-group textarea {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--text);
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .cli-form-group input:focus,
+    .cli-form-group textarea:focus {
+      border-color: var(--primary);
+      outline: none;
+    }
+    .cli-form-group textarea { resize: vertical; min-height: 70px; }
+
+    /* ── Historial de reservas ── */
+    .cli-hist-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .cli-hist-row:last-child { border-bottom: none; }
+
+    /* ── No hay resultados ── */
+    .cli-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .cli-empty .icon { font-size: 3rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">🏨 HDQ</div>
+      <div class="client-name" id="sidebar-username">…</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-avatar">👤</div>
+        <div class="user-details">
+          <div class="name" id="sidebar-username-footer">…</div>
+          <div class="role" id="sidebar-role">…</div>
+        </div>
+      </div>
+      <button class="btn-logout" id="btn-logout">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="topbar-title">Clientes</span>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbar-date"></span>
+        <button class="btn btn-accent btn-sm" onclick="abrirFormNuevo()">+ Nuevo Cliente</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- Cabecera -->
+      <div class="page-header" style="margin-bottom:16px;">
+        <div>
+          <h1>👤 Gestión de Clientes</h1>
+          <p>Registra y actualiza datos de tus huéspedes. Ningún campo es obligatorio.</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirFormNuevo()">+ Nuevo Cliente</button>
+      </div>
+
+      <!-- Buscador -->
+      <div class="cli-search-wrap">
+        <span class="cli-search-icon">🔍</span>
+        <input type="text" id="cli-search" class="form-control"
+               placeholder="Buscar por nombre, empresa, RUT o email…"
+               oninput="buscarClientes()" />
+      </div>
+
+      <!-- Contador -->
+      <div id="cli-contador" style="font-size:0.82rem;color:var(--text-muted);margin:10px 0;"></div>
+
+      <!-- Grid de tarjetas -->
+      <div id="cli-grid" class="cli-grid"></div>
+
+      <!-- Ficha de cliente -->
+      <div id="cli-panel" class="cli-panel">
+        <div class="cli-panel-header">
+          <div class="cli-panel-avatar" id="panel-avatar">?</div>
+          <div>
+            <div class="cli-panel-title" id="panel-nombre">—</div>
+            <div class="cli-panel-sub"   id="panel-empresa">—</div>
+          </div>
+          <button onclick="cerrarPanel()"
+                  style="margin-left:auto;background:none;border:none;
+                         font-size:1.3rem;cursor:pointer;color:var(--text-muted);">✕</button>
+        </div>
+
+        <!-- Formulario edición -->
+        <form id="cli-form">
+          <input type="hidden" id="cli-id" value="" />
+          <div class="cli-form-grid">
+            <div class="cli-form-group">
+              <label>Nombre completo</label>
+              <input type="text" id="cli-nombre"   placeholder="Nombre y apellido" />
+            </div>
+            <div class="cli-form-group">
+              <label>Empresa / Referencia</label>
+              <input type="text" id="cli-empresa"  placeholder="Empresa, institución…" />
+            </div>
+            <div class="cli-form-group">
+              <label>RUT</label>
+              <input type="text" id="cli-rut" placeholder="12.345.678-9"
+                     maxlength="12" oninput="autoFormatRUT(this)" />
+            </div>
+            <div class="cli-form-group">
+              <label>Teléfono</label>
+              <input type="tel" id="cli-telefono" placeholder="+56 9 XXXX XXXX" />
+            </div>
+            <div class="cli-form-group">
+              <label>Email</label>
+              <input type="email" id="cli-email"   placeholder="correo@ejemplo.cl" />
+            </div>
+            <div class="cli-form-group">
+              <label>Notas internas</label>
+              <input type="text" id="cli-notas"   placeholder="Preferencias, referencias…" />
+            </div>
+          </div>
+          <div id="cli-form-alert" style="margin:12px 0;"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="cli-btn-guardar"
+                    onclick="guardarCliente()">
+              💾 Guardar Cliente
+            </button>
+            <button type="button" class="btn btn-outline" onclick="cerrarPanel()">Cancelar</button>
+            <button type="button" class="btn btn-danger btn-sm"
+                    id="cli-btn-eliminar" onclick="eliminarCliente()"
+                    style="margin-left:auto;display:none;">🗑️ Eliminar</button>
+          </div>
+        </form>
+
+        <!-- Historial de reservas -->
+        <div id="panel-historial-wrap" style="margin-top:28px;display:none;">
+          <h3 style="font-size:0.95rem;color:var(--primary);margin-bottom:10px;
+                     border-top:1px solid var(--border);padding-top:14px;">
+            📋 Reservas vinculadas
+          </h3>
+          <div id="panel-historial"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/reservas.js"></script>
+<script>
+const session = AUTH.getSession();
+const role    = session?.role || 'staff';
+const avatarMap = { owner:'👑', staff:'📞' };
+
+document.getElementById('sidebar-avatar').textContent = avatarMap[role] || '👤';
+document.getElementById('sidebar-nav').innerHTML = buildSidebarNav(role, 'clientes');
+initLayout('clientes');
+
+/* ================================================
+   LISTADO Y BÚSQUEDA
+   ================================================ */
+let _clientesFiltrados = [];
+let _clienteIdActual   = null;
+
+function buscarClientes() {
+  const q = document.getElementById('cli-search').value.trim();
+  _clientesFiltrados = q.length > 0
+    ? CLIENTES.buscar(q)
+    : CLIENTES.getAll();
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('cli-grid');
+  const cont = document.getElementById('cli-contador');
+
+  const todos = _clientesFiltrados;
+  cont.textContent = `${todos.length} cliente${todos.length !== 1 ? 's' : ''} encontrado${todos.length !== 1 ? 's' : ''}`;
+
+  if (todos.length === 0) {
+    grid.innerHTML = `
+      <div class="cli-empty" style="grid-column:1/-1;">
+        <div class="icon">👤</div>
+        <p>No hay clientes registrados aún.</p>
+        <button class="btn btn-primary" style="margin-top:14px;" onclick="abrirFormNuevo()">
+          + Crear primer cliente
+        </button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = todos.map((c, i) => {
+    const inicial = (c.nombre || c.empresa || '?').charAt(0).toUpperCase();
+    const nombre  = c.nombre  || (c.empresa ? c.empresa : '—');
+    const empresa = c.empresa && c.empresa !== nombre ? c.empresa : '';
+    const reservasVinc = RESERVAS.getAll().filter(r => r.cliente_id === c.id).length;
+    return `
+      <div class="cli-card" onclick="abrirFicha('${c.id}')">
+        <div class="cli-card-avatar">${inicial}</div>
+        <div class="cli-card-nombre">${nombre}</div>
+        ${empresa ? `<div class="cli-card-empresa">🏢 ${empresa}</div>` : ''}
+        <div class="cli-card-datos">
+          ${c.rut      ? `<span>🪪 ${c.rut}</span>` : ''}
+          ${c.email    ? `<span>📧 ${c.email}</span>` : ''}
+          ${c.telefono ? `<span>📞 ${c.telefono}</span>` : ''}
+        </div>
+        ${reservasVinc > 0
+          ? `<div class="cli-card-chip">📋 ${reservasVinc} reserva${reservasVinc!==1?'s':''}</div>`
+          : ''}
+      </div>`;
+  }).join('');
+}
+
+/* ================================================
+   FICHA DE CLIENTE
+   ================================================ */
+function abrirFicha(id) {
+  const c = CLIENTES.getById(id);
+  if (!c) return;
+  _clienteIdActual = id;
+
+  const nombre  = c.nombre  || c.empresa || '—';
+  const empresa = c.empresa || '';
+  const inicial = nombre.charAt(0).toUpperCase();
+
+  document.getElementById('panel-avatar').textContent   = inicial;
+  document.getElementById('panel-nombre').textContent   = nombre;
+  document.getElementById('panel-empresa').textContent  = empresa || (c.rut || c.email || '');
+
+  document.getElementById('cli-id').value       = id;
+  document.getElementById('cli-nombre').value   = c.nombre   || '';
+  document.getElementById('cli-empresa').value  = c.empresa  || '';
+  document.getElementById('cli-rut').value      = c.rut      || '';
+  document.getElementById('cli-telefono').value = c.telefono || '';
+  document.getElementById('cli-email').value    = c.email    || '';
+  document.getElementById('cli-notas').value    = c.notas    || '';
+
+  document.getElementById('cli-btn-guardar').textContent = '💾 Actualizar Cliente';
+  document.getElementById('cli-btn-eliminar').style.display = 'inline-flex';
+
+  /* Historial de reservas */
+  const reservas = RESERVAS.getAll().filter(r => r.cliente_id === id);
+  const histWrap = document.getElementById('panel-historial-wrap');
+  const histEl   = document.getElementById('panel-historial');
+  if (reservas.length > 0) {
+    histWrap.style.display = 'block';
+    histEl.innerHTML = reservas.map(r => `
+      <div class="cli-hist-row">
+        <div>
+          <strong style="font-size:0.82rem;">${r.id}</strong>
+          <span style="margin-left:8px;font-size:0.78rem;color:var(--text-muted);">
+            ${formatDate(r.checkin)} → ${formatDate(r.checkout)}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:0.82rem;">${r.habitaciones?.map(h=>'Hab.'+h.numero).join(', ')||'—'}</span>
+          <span class="badge badge-${r.estado==='pendiente'?'pending':r.estado==='confirmada'?'confirmed':'cancelled'}">
+            ${r.estado}
+          </span>
+        </div>
+      </div>`).join('');
+  } else {
+    histWrap.style.display = 'none';
+  }
+
+  document.getElementById('cli-form-alert').innerHTML = '';
+  document.getElementById('cli-panel').classList.add('visible');
+  document.getElementById('cli-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function abrirFormNuevo() {
+  _clienteIdActual = null;
+  document.getElementById('cli-id').value       = '';
+  document.getElementById('cli-nombre').value   = '';
+  document.getElementById('cli-empresa').value  = '';
+  document.getElementById('cli-rut').value      = '';
+  document.getElementById('cli-telefono').value = '';
+  document.getElementById('cli-email').value    = '';
+  document.getElementById('cli-notas').value    = '';
+  document.getElementById('panel-avatar').textContent  = '➕';
+  document.getElementById('panel-nombre').textContent  = 'Nuevo Cliente';
+  document.getElementById('panel-empresa').textContent = 'Completa los datos disponibles';
+  document.getElementById('cli-btn-guardar').textContent = '💾 Guardar Cliente';
+  document.getElementById('cli-btn-eliminar').style.display = 'none';
+  document.getElementById('panel-historial-wrap').style.display = 'none';
+  document.getElementById('cli-form-alert').innerHTML = '';
+  document.getElementById('cli-panel').classList.add('visible');
+  document.getElementById('cli-nombre').focus();
+  document.getElementById('cli-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cerrarPanel() {
+  document.getElementById('cli-panel').classList.remove('visible');
+  _clienteIdActual = null;
+}
+
+/* ================================================
+   GUARDAR (crear o actualizar)
+   ================================================ */
+function guardarCliente() {
+  const alertEl = document.getElementById('cli-form-alert');
+
+  try {
+    const data = {
+      nombre:   (document.getElementById('cli-nombre')?.value   || '').trim(),
+      empresa:  (document.getElementById('cli-empresa')?.value  || '').trim(),
+      rut:      (document.getElementById('cli-rut')?.value      || '').trim(),
+      telefono: (document.getElementById('cli-telefono')?.value || '').trim(),
+      email:    (document.getElementById('cli-email')?.value    || '').trim(),
+      notas:    (document.getElementById('cli-notas')?.value    || '').trim()
+    };
+
+    /* Al menos un identificador */
+    if (!data.nombre && !data.empresa) {
+      alertEl.innerHTML = `<div class="alert alert-error">
+        <span>❌</span><span>Ingresa al menos el nombre o empresa del cliente.</span></div>`;
+      return;
+    }
+
+    /* Validar RUT solo si se ingresó */
+    if (data.rut) {
+      const limpio = data.rut.replace(/[^0-9kK]/g, '').toUpperCase();
+      if (limpio.length >= 2) {
+        /* validación inline para evitar depender de función externa */
+        const body = limpio.slice(0, -1);
+        const dv   = limpio.slice(-1);
+        let suma = 0, mult = 2;
+        for (let i = body.length - 1; i >= 0; i--) {
+          suma += parseInt(body[i]) * mult;
+          mult  = mult === 7 ? 2 : mult + 1;
+        }
+        const resto = suma % 11;
+        const dvEsp = resto === 0 ? '0' : resto === 1 ? 'K' : String(11 - resto);
+        if (dv !== dvEsp) {
+          alertEl.innerHTML = `<div class="alert alert-error">
+            <span>❌</span><span>El RUT ingresado no es válido. Verifica el dígito verificador.</span></div>`;
+          return;
+        }
+      }
+    }
+
+    const existingId = (document.getElementById('cli-id')?.value || '').trim();
+
+    if (existingId) {
+      /* Actualizar */
+      CLIENTES.update(existingId, data);
+      alertEl.innerHTML = `<div class="alert alert-success">
+        <span>✅</span><span>Cliente actualizado correctamente.</span></div>`;
+    } else {
+      /* Crear nuevo */
+      const id = CLIENTES.save(data);
+      if (document.getElementById('cli-id')) document.getElementById('cli-id').value = id;
+      if (document.getElementById('cli-btn-guardar'))
+        document.getElementById('cli-btn-guardar').textContent = '💾 Actualizar Cliente';
+      if (document.getElementById('cli-btn-eliminar'))
+        document.getElementById('cli-btn-eliminar').style.display = 'inline-flex';
+      alertEl.innerHTML = `<div class="alert alert-success">
+        <span>✅</span><span>Cliente guardado correctamente.</span></div>`;
+    }
+
+    /* Actualizar header del panel */
+    const nombre = data.nombre || data.empresa || '—';
+    if (document.getElementById('panel-avatar'))
+      document.getElementById('panel-avatar').textContent = nombre.charAt(0).toUpperCase();
+    if (document.getElementById('panel-nombre'))
+      document.getElementById('panel-nombre').textContent = nombre;
+    if (document.getElementById('panel-empresa'))
+      document.getElementById('panel-empresa').textContent = data.empresa || data.rut || data.email || '';
+
+    /* Refrescar grid */
+    buscarClientes();
+    setTimeout(() => { if (alertEl) alertEl.innerHTML = ''; }, 3000);
+
+  } catch(err) {
+    console.error('[Clientes] Error al guardar:', err);
+    alertEl.innerHTML = `<div class="alert alert-error">
+      <span>❌</span><span>Error inesperado: ${err.message}</span></div>`;
+  }
+}
+
+/* ================================================
+   ELIMINAR
+   ================================================ */
+function eliminarCliente() {
+  const id = document.getElementById('cli-id').value;
+  if (!id) return;
+  const c = CLIENTES.getById(id);
+  const nombre = c?.nombre || c?.empresa || id;
+  if (!confirm(`¿Eliminar a "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  CLIENTES.remove(id);
+  cerrarPanel();
+  buscarClientes();
+}
+
+/* ================================================
+   INICIO
+   ================================================ */
+buscarClientes();
+</script>
+</body>
+</html>

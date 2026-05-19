@@ -139,46 +139,7 @@ if (session) {
   const role = session.role;
 
   /* ── Sidebar nav según rol ───────────────────── */
-  const navOwner = `
-    <div class="nav-section">Menú</div>
-    <a href="dashboard.html" class="nav-item" data-page="dashboard">
-      <span class="nav-icon">📊</span> Mi Dashboard</a>
-    <a href="reservar.html" class="nav-item" data-page="reservar">
-      <span class="nav-icon">📞</span> Nueva Reserva</a>
-    <a href="calendario.html" class="nav-item" data-page="calendario">
-      <span class="nav-icon">🗓️</span> Calendario</a>
-    <div class="nav-section" style="margin-top:12px;">Administración</div>
-    <a href="admin.html" class="nav-item" data-page="admin">
-      <span class="nav-icon">🔧</span> Panel Admin</a>`;
-
-  const navStaff = `
-    <div class="nav-section">Menú</div>
-    <a href="dashboard.html" class="nav-item" data-page="dashboard">
-      <span class="nav-icon">📊</span> Mi Dashboard</a>
-    <a href="reservar.html" class="nav-item" data-page="reservar">
-      <span class="nav-icon">📞</span> Nueva Reserva</a>
-    <a href="calendario.html" class="nav-item" data-page="calendario">
-      <span class="nav-icon">🗓️</span> Calendario</a>`;
-
-  const navWeb = `
-    <div class="nav-section">Menú</div>
-    <a href="dashboard.html" class="nav-item" data-page="dashboard">
-      <span class="nav-icon">📊</span> Mis Reservas</a>
-    <a href="reservar.html" class="nav-item" data-page="reservar">
-      <span class="nav-icon">📅</span> Nueva Reserva</a>
-    <a href="calendario.html" class="nav-item" data-page="calendario">
-      <span class="nav-icon">🗓️</span> Calendario</a>
-    <div class="nav-section" style="margin-top:12px;">Información</div>
-    <a href="#info-hostal" class="nav-item">
-      <span class="nav-icon">ℹ️</span> Info Hostal</a>`;
-
-  const navMap = { owner: navOwner, staff: navStaff, web: navWeb };
-  document.getElementById('sidebar-nav').innerHTML = navMap[role] || navWeb;
-
-  /* Re-marcar activo */
-  document.querySelectorAll('.nav-item[data-page]').forEach(l => {
-    if (l.dataset.page === 'dashboard') l.classList.add('active');
-  });
+  document.getElementById('sidebar-nav').innerHTML = buildSidebarNav(role, 'dashboard');
 
   /* ── Avatar e info según rol ─────────────────── */
   const avatarMap  = { owner: '👑', staff: '📞', web: '🏢' };
@@ -270,23 +231,55 @@ if (session) {
     const ingr = misReservas.filter(r => r.estado !== 'cancelada').reduce((s,r)=>s+(r.total||0),0);
     const noch = misReservas.filter(r => r.estado !== 'cancelada').reduce((s,r)=>s+(r.noches||0),0);
 
-    document.getElementById('stats-grid').innerHTML = `
-      <div class="stat-card"><div class="stat-icon">📋</div>
-        <div class="stat-info"><div class="value">${misReservas.length}</div><div class="label">Total</div></div></div>
-      <div class="stat-card" style="border-left-color:var(--warning);">
-        <div class="stat-icon" style="background:#fef9e7;">⏳</div>
-        <div class="stat-info"><div class="value">${pend}</div><div class="label">Pendientes</div></div></div>
-      <div class="stat-card" style="border-left-color:var(--success);">
-        <div class="stat-icon" style="background:#eafaf1;">✅</div>
-        <div class="stat-info"><div class="value">${conf}</div><div class="label">Confirmadas</div></div></div>
-      <div class="stat-card" style="border-left-color:#8e44ad;">
-        <div class="stat-icon" style="background:#f5eef8;">💰</div>
-        <div class="stat-info"><div class="value">${formatCLP(ingr)}</div>
-          <div class="label">${role==='owner'?'Ingresos Totales':'Total'}</div></div></div>
-      ${role==='owner'?`
-      <div class="stat-card" style="border-left-color:#1abc9c;">
-        <div class="stat-icon" style="background:#e8f8f5;">🌙</div>
-        <div class="stat-info"><div class="value">${noch}</div><div class="label">Noches</div></div></div>`:''}`;
+    /* ── Stats: owner ve ingresos, staff solo conteo/ocupación ── */
+    const totalHabs = Object.keys(HABITACIONES).length;
+    const habsOcupHoy = (() => {
+      const hoy = new Date();
+      const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+      return misReservas.filter(r =>
+        r.estado !== 'cancelada' &&
+        r.checkin <= hoyStr && r.checkout > hoyStr
+      ).reduce((s,r) => s + (r.habitaciones?.length||0), 0);
+    })();
+    const pctOcup = Math.round(habsOcupHoy / totalHabs * 100);
+
+    if (role === 'owner') {
+      document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-icon">📋</div>
+          <div class="stat-info"><div class="value">${misReservas.length}</div><div class="label">Reservas activas</div></div></div>
+        <div class="stat-card" style="border-left-color:var(--warning);">
+          <div class="stat-icon" style="background:#fef9e7;">⏳</div>
+          <div class="stat-info"><div class="value">${pend}</div><div class="label">Pendientes</div></div></div>
+        <div class="stat-card" style="border-left-color:var(--success);">
+          <div class="stat-icon" style="background:#eafaf1;">✅</div>
+          <div class="stat-info"><div class="value">${conf}</div><div class="label">Confirmadas</div></div></div>
+        <div class="stat-card" style="border-left-color:#8e44ad;">
+          <div class="stat-icon" style="background:#f5eef8;">💰</div>
+          <div class="stat-info"><div class="value">${formatCLP(ingr)}</div>
+            <div class="label">Ingresos Totales</div></div></div>
+        <div class="stat-card" style="border-left-color:#1abc9c;">
+          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
+          <div class="stat-info"><div class="value">${pctOcup}%</div>
+            <div class="label">Ocupación hoy (${habsOcupHoy}/${totalHabs})</div></div></div>
+        <div class="stat-card" style="border-left-color:#0ea5e9;">
+          <div class="stat-icon" style="background:#f0f9ff;">🌙</div>
+          <div class="stat-info"><div class="value">${noch}</div><div class="label">Noches totales</div></div></div>`;
+    } else {
+      /* Staff (Nelson): ocupación y conteo — sin montos */
+      document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-icon">📋</div>
+          <div class="stat-info"><div class="value">${misReservas.length}</div><div class="label">Reservas activas</div></div></div>
+        <div class="stat-card" style="border-left-color:var(--warning);">
+          <div class="stat-icon" style="background:#fef9e7;">⏳</div>
+          <div class="stat-info"><div class="value">${pend}</div><div class="label">Pendientes</div></div></div>
+        <div class="stat-card" style="border-left-color:var(--success);">
+          <div class="stat-icon" style="background:#eafaf1;">✅</div>
+          <div class="stat-info"><div class="value">${conf}</div><div class="label">Confirmadas</div></div></div>
+        <div class="stat-card" style="border-left-color:#1abc9c;">
+          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
+          <div class="stat-info"><div class="value">${pctOcup}%</div>
+            <div class="label">Ocupación hoy (${habsOcupHoy}/${totalHabs})</div></div></div>`;
+    }
 
     const fuenteBadge = fuente === 'sheets'
       ? `<span style="font-size:0.75rem;background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;
@@ -301,7 +294,8 @@ if (session) {
 
     renderReservasTable('reservas-container', misReservas.slice(0, 20), {
       showOrigen:  role === 'owner' || role === 'staff',
-      showActions: role === 'owner' || role === 'staff'
+      showActions: role === 'owner' || role === 'staff',
+      showTotal:   role === 'owner'   /* Nelson no ve montos */
     });
   }
 

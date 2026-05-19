@@ -1,20 +1,23 @@
 /* ====================================================
    HOSTAL HDQ — Google Apps Script
    Pegar este código completo en Apps Script
+   Maneja dos hojas: "Reservas" y "Clientes"
    ==================================================== */
 
-const HOJA_NOMBRE = 'Reservas';
-
 /* ──────────────────────────────────────────────────
-   CABECERAS de la hoja (columnas visibles en Sheets)
+   CONFIGURACIÓN
    ────────────────────────────────────────────────── */
-const CABECERAS = [
+const HOJA_RESERVAS  = 'Reservas';
+const HOJA_CLIENTES  = 'Clientes';
+
+const CABECERAS_RESERVAS = [
   'ID',
   'Estado',
   'Origen',
   'Registrado Por',
   'Cliente / Empresa',
   'Huésped',
+  'RUT',
   'Email',
   'Teléfono',
   'Check-in',
@@ -29,25 +32,33 @@ const CABECERAS = [
   'Total CLP',
   'Fecha Reserva',
   'Comentarios',
-  '_json'           // ← columna oculta: datos completos para la app
+  '_json'
+];
+
+const CABECERAS_CLIENTES = [
+  'ID',
+  'Nombre',
+  'Empresa',
+  'RUT',
+  'Email',
+  'Teléfono',
+  'Notas',
+  'Fecha Registro',
+  'Fecha Actualización',
+  '_json'
 ];
 
 /* ──────────────────────────────────────────────────
-   ENDPOINTS
+   ENDPOINTS GET
    ────────────────────────────────────────────────── */
 function doGet(e) {
   try {
     const action = (e.parameter.action || '').trim();
 
-    if (action === 'getAll') {
-      return resp(getAll());
-    }
-    if (action === 'updateEstado') {
-      return resp(updateEstado(e.parameter.id, e.parameter.estado));
-    }
-    if (action === 'ping') {
-      return resp({ ok: true, mensaje: 'Hostal HDQ API activa ✅' });
-    }
+    if (action === 'getAll')        return resp(getAllReservas());
+    if (action === 'getClientes')   return resp(getAllClientes());
+    if (action === 'updateEstado')  return resp(updateEstado(e.parameter.id, e.parameter.estado));
+    if (action === 'ping')          return resp({ ok: true, mensaje: 'Hostal HDQ API activa ✅' });
 
     return resp({ ok: false, error: 'Acción no reconocida: ' + action });
 
@@ -56,17 +67,17 @@ function doGet(e) {
   }
 }
 
+/* ──────────────────────────────────────────────────
+   ENDPOINTS POST
+   ────────────────────────────────────────────────── */
 function doPost(e) {
   try {
-    const body = JSON.parse(e.postData.contents);
+    const body   = JSON.parse(e.postData.contents);
     const action = (body.action || '').trim();
 
-    if (action === 'save') {
-      return resp(guardarReserva(body.reserva));
-    }
-    if (action === 'updateEstado') {
-      return resp(updateEstado(body.id, body.estado));
-    }
+    if (action === 'save')          return resp(guardarReserva(body.reserva));
+    if (action === 'updateEstado')  return resp(updateEstado(body.id, body.estado));
+    if (action === 'saveCliente')   return resp(guardarCliente(body.cliente));
 
     return resp({ ok: false, error: 'Acción no reconocida: ' + action });
 
@@ -82,39 +93,143 @@ function resp(data) {
 }
 
 /* ──────────────────────────────────────────────────
-   OBTENER / CREAR HOJA
+   OBTENER / CREAR HOJA RESERVAS
    ────────────────────────────────────────────────── */
-function getHoja() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let hoja = ss.getSheetByName(HOJA_NOMBRE);
+function getHojaReservas() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName(HOJA_RESERVAS);
 
   if (!hoja) {
-    hoja = ss.insertSheet(HOJA_NOMBRE);
+    hoja = ss.insertSheet(HOJA_RESERVAS);
 
-    // Encabezados con formato
-    const rango = hoja.getRange(1, 1, 1, CABECERAS.length);
-    rango.setValues([CABECERAS]);
+    const rango = hoja.getRange(1, 1, 1, CABECERAS_RESERVAS.length);
+    rango.setValues([CABECERAS_RESERVAS]);
     rango.setFontWeight('bold');
     rango.setBackground('#1e3a5f');
     rango.setFontColor('#ffffff');
     hoja.setFrozenRows(1);
+    hoja.hideColumns(CABECERAS_RESERVAS.length);
 
-    // Ocultar columna _json (última)
-    hoja.hideColumns(CABECERAS.length);
-
-    // Anchos de columna legibles
-    hoja.setColumnWidth(1, 130);   // ID
-    hoja.setColumnWidth(2, 100);   // Estado
-    hoja.setColumnWidth(3, 120);   // Origen
-    hoja.setColumnWidth(6, 160);   // Huésped
-    hoja.setColumnWidth(7, 190);   // Email
-    hoja.setColumnWidth(9, 90);    // Check-in
-    hoja.setColumnWidth(10, 90);   // Check-out
-    hoja.setColumnWidth(12, 200);  // Habitaciones
-    hoja.setColumnWidth(18, 100);  // Total
+    hoja.setColumnWidth(1, 130);
+    hoja.setColumnWidth(2, 100);
+    hoja.setColumnWidth(3, 120);
+    hoja.setColumnWidth(6, 160);
+    hoja.setColumnWidth(7, 110);
+    hoja.setColumnWidth(8, 190);
+    hoja.setColumnWidth(10, 90);
+    hoja.setColumnWidth(11, 90);
+    hoja.setColumnWidth(13, 200);
+    hoja.setColumnWidth(19, 100);
   }
 
   return hoja;
+}
+
+/* ──────────────────────────────────────────────────
+   OBTENER / CREAR HOJA CLIENTES
+   ────────────────────────────────────────────────── */
+function getHojaClientes() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName(HOJA_CLIENTES);
+
+  if (!hoja) {
+    hoja = ss.insertSheet(HOJA_CLIENTES);
+
+    const rango = hoja.getRange(1, 1, 1, CABECERAS_CLIENTES.length);
+    rango.setValues([CABECERAS_CLIENTES]);
+    rango.setFontWeight('bold');
+    rango.setBackground('#065f46');
+    rango.setFontColor('#ffffff');
+    hoja.setFrozenRows(1);
+    hoja.hideColumns(CABECERAS_CLIENTES.length);
+
+    hoja.setColumnWidth(1, 140);   // ID
+    hoja.setColumnWidth(2, 180);   // Nombre
+    hoja.setColumnWidth(3, 160);   // Empresa
+    hoja.setColumnWidth(4, 110);   // RUT
+    hoja.setColumnWidth(5, 190);   // Email
+    hoja.setColumnWidth(6, 120);   // Teléfono
+    hoja.setColumnWidth(7, 220);   // Notas
+    hoja.setColumnWidth(8, 130);   // Fecha Registro
+    hoja.setColumnWidth(9, 130);   // Fecha Actualización
+  }
+
+  return hoja;
+}
+
+/* ──────────────────────────────────────────────────
+   GUARDAR / ACTUALIZAR CLIENTE
+   Si el ID ya existe → actualiza la fila.
+   Si no existe      → agrega fila nueva.
+   ────────────────────────────────────────────────── */
+function guardarCliente(c) {
+  if (!c) return { ok: false, error: 'Datos de cliente vacíos.' };
+
+  const hoja  = getHojaClientes();
+  const datos = hoja.getDataRange().getValues();
+
+  const fila = [
+    c.id               || '',
+    c.nombre           || '',
+    c.empresa          || '',
+    c.rut              || '',
+    c.email            || '',
+    c.telefono         || '',
+    c.notas            || '',
+    c.fecha_registro   ? new Date(c.fecha_registro).toLocaleString('es-CL') : new Date().toLocaleString('es-CL'),
+    c.fecha_actualizado ? new Date(c.fecha_actualizado).toLocaleString('es-CL') : '',
+    JSON.stringify(c)
+  ];
+
+  /* Buscar fila existente por ID */
+  for (let i = 1; i < datos.length; i++) {
+    if (String(datos[i][0]) === String(c.id)) {
+      /* Actualizar fila existente */
+      hoja.getRange(i + 1, 1, 1, fila.length).setValues([fila]);
+      hoja.getRange(i + 1, 1, 1, CABECERAS_CLIENTES.length - 1).setBackground('#f0fdf4');
+      return { ok: true, accion: 'actualizado', id: c.id };
+    }
+  }
+
+  /* Cliente nuevo → agregar fila */
+  hoja.appendRow(fila);
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila % 2 === 0) {
+    hoja.getRange(ultimaFila, 1, 1, CABECERAS_CLIENTES.length - 1)
+        .setBackground('#ecfdf5');
+  }
+
+  return { ok: true, accion: 'creado', id: c.id };
+}
+
+/* ──────────────────────────────────────────────────
+   OBTENER TODOS LOS CLIENTES
+   ────────────────────────────────────────────────── */
+function getAllClientes() {
+  const hoja  = getHojaClientes();
+  const datos = hoja.getDataRange().getValues();
+
+  if (datos.length <= 1) return { ok: true, clientes: [] };
+
+  const jsonCol = CABECERAS_CLIENTES.length - 1;
+
+  const clientes = datos.slice(1).map(fila => {
+    try {
+      return JSON.parse(fila[jsonCol] || '{}');
+    } catch {
+      return {
+        id:       fila[0],
+        nombre:   fila[1],
+        empresa:  fila[2],
+        rut:      fila[3],
+        email:    fila[4],
+        telefono: fila[5],
+        notas:    fila[6]
+      };
+    }
+  }).filter(c => c.id);
+
+  return { ok: true, clientes };
 }
 
 /* ──────────────────────────────────────────────────
@@ -123,7 +238,7 @@ function getHoja() {
 function guardarReserva(r) {
   if (!r) return { ok: false, error: 'Datos de reserva vacíos.' };
 
-  const hoja = getHoja();
+  const hoja = getHojaReservas();
   const id   = r.id || ('HDQ-' + Date.now().toString(36).toUpperCase());
   r.id       = id;
   r.estado   = r.estado || 'pendiente';
@@ -134,40 +249,38 @@ function guardarReserva(r) {
 
   const fila = [
     id,
-    'pendiente',
-    r.origen            || 'Web',
-    r.registrado_por    || '',
-    r.cliente           || '',
-    r.huesped_nombre    || '',
-    r.huesped_email     || '',
-    r.huesped_telefono  || '',
-    r.checkin           || '',
-    r.checkout          || '',
-    r.noches            || 0,
+    r.estado,
+    r.origen             || 'Web',
+    r.registrado_por     || '',
+    r.cliente            || '',
+    r.huesped_nombre     || '',
+    r.huesped_rut        || '',
+    r.huesped_email      || '',
+    r.huesped_telefono   || '',
+    r.checkin            || '',
+    r.checkout           || '',
+    r.noches             || 0,
     habTexto,
-    r.desayunos?.cantidad     || 0,
-    r.subtotal_habs           || 0,
-    r.subtotal_desayunos      || 0,
-    r.descuento?.monto        || 0,
-    r.descuento?.motivo       || '',
-    r.total                   || 0,
+    r.desayunos?.cantidad      || 0,
+    r.subtotal_habs            || 0,
+    r.subtotal_desayunos       || 0,
+    r.descuento?.monto         || 0,
+    r.descuento?.motivo        || '',
+    r.total                    || 0,
     new Date().toLocaleString('es-CL'),
-    r.comentarios             || '',
-    JSON.stringify(r)         // columna _json
+    r.comentarios              || '',
+    JSON.stringify(r)
   ];
 
   hoja.appendRow(fila);
 
-  // Formato de moneda en columnas de precio
   const ultimaFila = hoja.getLastRow();
-  [14, 15, 16, 18].forEach(col => {
-    hoja.getRange(ultimaFila, col)
-        .setNumberFormat('$#,##0');
+  [15, 16, 17, 19].forEach(col => {
+    hoja.getRange(ultimaFila, col).setNumberFormat('$#,##0');
   });
 
-  // Color de fondo alternado
   if (ultimaFila % 2 === 0) {
-    hoja.getRange(ultimaFila, 1, 1, CABECERAS.length - 1)
+    hoja.getRange(ultimaFila, 1, 1, CABECERAS_RESERVAS.length - 1)
         .setBackground('#f0f4f8');
   }
 
@@ -175,72 +288,69 @@ function guardarReserva(r) {
 }
 
 /* ──────────────────────────────────────────────────
-   OBTENER TODAS LAS RESERVAS (devuelve JSON completo)
+   OBTENER TODAS LAS RESERVAS
    ────────────────────────────────────────────────── */
-function getAll() {
-  const hoja = getHoja();
+function getAllReservas() {
+  const hoja  = getHojaReservas();
   const datos = hoja.getDataRange().getValues();
 
   if (datos.length <= 1) return { ok: true, reservas: [] };
 
-  const jsonCol = CABECERAS.length - 1; // índice columna _json
+  const jsonCol = CABECERAS_RESERVAS.length - 1;
 
   const reservas = datos.slice(1).map(fila => {
     try {
-      // Reconstruir desde columna _json
-      const obj = JSON.parse(fila[jsonCol] || '{}');
-      // Sobreescribir estado con el valor actual de la hoja
-      // (puede haber sido editado manualmente o desde el panel)
+      const obj  = JSON.parse(fila[jsonCol] || '{}');
       obj.estado = fila[1] || obj.estado || 'pendiente';
       obj.id     = fila[0] || obj.id;
       return obj;
-    } catch (e) {
-      // Fallback: construir desde columnas visibles
+    } catch {
       return {
-        id:              fila[0],
-        estado:          fila[1],
-        origen:          fila[2],
-        registrado_por:  fila[3],
-        cliente:         fila[4],
-        huesped_nombre:  fila[5],
-        huesped_email:   fila[6],
-        huesped_telefono:fila[7],
-        checkin:         fila[8],
-        checkout:        fila[9],
-        noches:          fila[10],
-        total:           fila[17],
-        fecha_reserva:   fila[18]
+        id:               fila[0],
+        estado:           fila[1],
+        origen:           fila[2],
+        registrado_por:   fila[3],
+        cliente:          fila[4],
+        huesped_nombre:   fila[5],
+        huesped_rut:      fila[6],
+        huesped_email:    fila[7],
+        huesped_telefono: fila[8],
+        checkin:          fila[9],
+        checkout:         fila[10],
+        noches:           fila[11],
+        total:            fila[18],
+        fecha_reserva:    fila[19]
       };
     }
-  }).filter(r => r.id); // descartar filas vacías
+  }).filter(r => r.id);
 
   return { ok: true, reservas };
 }
 
 /* ──────────────────────────────────────────────────
-   CAMBIAR ESTADO
+   CAMBIAR ESTADO DE RESERVA
    ────────────────────────────────────────────────── */
 function updateEstado(id, estado) {
   if (!id || !estado) return { ok: false, error: 'Parámetros faltantes.' };
 
-  const hoja  = getHoja();
+  const hoja  = getHojaReservas();
   const datos = hoja.getDataRange().getValues();
-  const colEstado = 2; // columna B (índice 1 → columna 2)
 
   for (let i = 1; i < datos.length; i++) {
     if (String(datos[i][0]) === String(id)) {
-      hoja.getRange(i + 1, colEstado).setValue(estado);
+      hoja.getRange(i + 1, 2).setValue(estado);
 
-      // Color de fila según estado
-      const colores = {
-        pendiente:  '#fef9e7',
-        confirmada: '#eafaf1',
-        cancelada:  '#fdedec'
-      };
-      const bg = colores[estado] || null;
-      if (bg) {
-        hoja.getRange(i + 1, 1, 1, CABECERAS.length - 1).setBackground(bg);
-      }
+      const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
+      const bg = colores[estado];
+      if (bg) hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
+
+      /* Actualizar también el _json con el nuevo estado */
+      try {
+        const jsonCol = CABECERAS_RESERVAS.length;
+        const obj = JSON.parse(datos[i][jsonCol - 1] || '{}');
+        obj.estado = estado;
+        hoja.getRange(i + 1, jsonCol).setValue(JSON.stringify(obj));
+      } catch (e) {}
 
       return { ok: true };
     }
@@ -250,29 +360,27 @@ function updateEstado(id, estado) {
 }
 
 /* ──────────────────────────────────────────────────
-   TRIGGER: Notificación por email cuando llega reserva nueva
-   (Opcional — activar en triggers de Apps Script)
+   NOTIFICACIÓN EMAIL (opcional)
    ────────────────────────────────────────────────── */
 function enviarNotificacionEmail(reserva) {
-  const destino = 'david@hostalhdq.cl'; // ← Cambia por tu email real
+  const destino = 'david@hostalhdq.cl';
   const asunto  = '🏨 Nueva Reserva HDQ — ' + reserva.id;
+  const cuerpo  = `
+Nueva reserva en Hostal HDQ.
 
-  const cuerpo = `
-Nueva reserva recibida en Hostal HDQ.
-
-ID:          ${reserva.id}
-Origen:      ${reserva.origen}
-Huésped:     ${reserva.huesped_nombre}
-Email:       ${reserva.huesped_email}
-Teléfono:    ${reserva.huesped_telefono}
-Check-in:    ${reserva.checkin}
-Check-out:   ${reserva.checkout}
-Noches:      ${reserva.noches}
-Habitaciones:${(reserva.habitaciones||[]).map(h=>'Hab.'+h.numero).join(', ')}
-Desayunos:   ${reserva.desayunos?.cantidad || 0} por día
-Total:       $${Number(reserva.total||0).toLocaleString('es-CL')} CLP
-Comentarios: ${reserva.comentarios || '—'}
+ID:           ${reserva.id}
+Origen:       ${reserva.origen}
+Huésped:      ${reserva.huesped_nombre}
+RUT:          ${reserva.huesped_rut || '—'}
+Email:        ${reserva.huesped_email}
+Teléfono:     ${reserva.huesped_telefono}
+Check-in:     ${reserva.checkin}
+Check-out:    ${reserva.checkout}
+Noches:       ${reserva.noches}
+Habitaciones: ${(reserva.habitaciones||[]).map(h=>'Hab.'+h.numero).join(', ')}
+Desayunos:    ${reserva.desayunos?.cantidad || 0} por día
+Total:        $${Number(reserva.total||0).toLocaleString('es-CL')} CLP
+Comentarios:  ${reserva.comentarios || '—'}
   `;
-
   MailApp.sendEmail(destino, asunto, cuerpo);
 }
