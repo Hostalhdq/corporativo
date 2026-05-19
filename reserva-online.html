@@ -536,13 +536,18 @@
    ───────────────────────────────────────────────────── */
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyIRVp3Ikj3OYDyVaJBeu7si6k5EsUzvuOO--H1_VkNsSXYkgfkFYtlwiEOT_uoyVlMFA/exec';
 
-const TIPOS = [
-  { id:'doble',       nombre:'Doble',             desc:'1 cama doble · hasta 2 personas',         precio:35700, plazas:2, icono:'🛏️',         numeros:['101'] },
-  { id:'matrimonial', nombre:'Matrimonial',        desc:'1 cama matrimonial · hasta 2 personas',   precio:40000, plazas:2, icono:'🛏️',         numeros:['202','203'] },
-  { id:'doble2camas', nombre:'Doble con 2 Camas',  desc:'2 camas individuales · hasta 2 personas', precio:40000, plazas:2, icono:'🛏️🛏️',      numeros:['103'] },
-  { id:'doscamas',    nombre:'2 Camas',            desc:'2 camas · hasta 2 personas',              precio:45000, plazas:2, icono:'🛏️🛏️',      numeros:['204'] },
-  { id:'triple',      nombre:'Triple',             desc:'3 camas · hasta 3 personas',              precio:60000, plazas:3, icono:'🛏️🛏️🛏️',    numeros:['205'] },
-  { id:'cuadruple',   nombre:'Cuádruple',          desc:'4 plazas · ideal familias o grupos',      precio:80000, plazas:4, icono:'🛏️🛏️',      numeros:['102','201','206','207'] }
+/* Habitaciones individuales agrupadas por piso */
+const HABITACIONES = [
+  { numero:'101', tipo:'Doble',          desc:'1 cama doble',                precio:35700, plazas:2, icono:'🛏️',      piso:1 },
+  { numero:'102', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:1 },
+  { numero:'103', tipo:'Doble 2 Camas',  desc:'2 camas individuales',        precio:40000, plazas:2, icono:'🛏️🛏️', piso:1 },
+  { numero:'201', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:2 },
+  { numero:'202', tipo:'Matrimonial',    desc:'1 cama matrimonial',          precio:40000, plazas:2, icono:'🛏️',      piso:2 },
+  { numero:'203', tipo:'Matrimonial',    desc:'1 cama matrimonial',          precio:40000, plazas:2, icono:'🛏️',      piso:2 },
+  { numero:'204', tipo:'2 Camas',        desc:'2 camas individuales',        precio:45000, plazas:2, icono:'🛏️🛏️', piso:2 },
+  { numero:'205', tipo:'Triple',         desc:'3 camas · hasta 3 personas',  precio:60000, plazas:3, icono:'🛏️🛏️🛏️', piso:2 },
+  { numero:'206', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:2 },
+  { numero:'207', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:2 }
 ];
 const PRECIO_DESAYUNO = 4000;
 
@@ -553,8 +558,8 @@ let state = {
   checkin:  '',
   checkout: '',
   noches:   0,
-  ocupadas: null,       // null = sin info, [] = todos disponibles
-  tipoSel:  null,
+  ocupadas: null,       // null = sin info, [] = todos libres
+  habsSel:  [],         // habitaciones seleccionadas (array de objetos)
   personasDesayuno: 0
 };
 
@@ -587,11 +592,14 @@ function noches(ci, co) {
 }
 
 function calcPrecio() {
-  const t = state.tipoSel;
-  if (!t) return { subHab: 0, subDes: 0, total: 0 };
-  const subHab = t.precio * state.noches;
+  if (!state.habsSel.length) return { subHab: 0, subDes: 0, total: 0 };
+  const subHab = state.habsSel.reduce((s, h) => s + h.precio, 0) * state.noches;
   const subDes = PRECIO_DESAYUNO * state.personasDesayuno * state.noches;
   return { subHab, subDes, total: subHab + subDes };
+}
+
+function maxPlazasSeleccionadas() {
+  return state.habsSel.reduce((s, h) => s + h.plazas, 0);
 }
 
 function fmtDate(d) {
@@ -661,81 +669,105 @@ $('btnVerHabitaciones').addEventListener('click', async () => {
    STEP 2 — HABITACIONES
    ───────────────────────────────────────────────────── */
 function renderRooms() {
-  const grid = $('roomsGrid');
+  const grid    = $('roomsGrid');
   grid.innerHTML = '';
+  state.habsSel  = [];
+  state.personasDesayuno = 0;
 
   const sinInfo = state.ocupadas === null;
 
   if (sinInfo) {
-    showAlert('alertDisp', '⚠️ No se pudo verificar disponibilidad en tiempo real. Todas las habitaciones se muestran — confirmaremos disponibilidad al procesar tu solicitud.', true);
-    $('alertDisp').className = 'alert alert-warning show';
+    $('alertDisp').textContent  = '⚠️ No se pudo verificar disponibilidad en tiempo real. Todas las habitaciones se muestran — confirmaremos al procesar tu solicitud.';
+    $('alertDisp').className    = 'alert alert-warning show';
   } else {
     showAlert('alertDisp', '', false);
   }
 
-  TIPOS.forEach(tipo => {
-    const card = document.createElement('div');
-    card.className = 'room-card';
-    card.dataset.id = tipo.id;
+  /* Agrupar por piso */
+  const pisos = [...new Set(HABITACIONES.map(h => h.piso))].sort();
 
-    // Calcular disponibilidad del tipo
-    let badgeHtml = '';
-    if (sinInfo) {
-      badgeHtml = '<span class="badge-disponible badge-loading">Sin verificar</span>';
-    } else {
-      const totalHabs     = tipo.numeros.length;
-      const ocupadasTipo  = tipo.numeros.filter(n => state.ocupadas.includes(n)).length;
-      const libres        = totalHabs - ocupadasTipo;
+  pisos.forEach(piso => {
+    /* Etiqueta de piso */
+    const pisoLabel = document.createElement('div');
+    pisoLabel.style.cssText = 'grid-column:1/-1; font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-top:.5rem; padding-bottom:.3rem; border-bottom:1px solid var(--border);';
+    pisoLabel.textContent   = 'Piso ' + piso;
+    grid.appendChild(pisoLabel);
 
-      if (libres === 0) {
-        card.classList.add('unavailable');
-        badgeHtml = '<span class="badge-disponible badge-no">Sin disponibilidad</span>';
-      } else {
-        badgeHtml = `<span class="badge-disponible badge-ok">Disponible (${libres})</span>`;
+    HABITACIONES.filter(h => h.piso === piso).forEach(hab => {
+      const ocupada = !sinInfo && state.ocupadas.includes(hab.numero);
+      const card    = document.createElement('div');
+      card.className    = 'room-card' + (ocupada ? ' unavailable' : '');
+      card.dataset.num  = hab.numero;
+
+      const badgeHtml = sinInfo
+        ? '<span class="badge-disponible badge-loading">Sin verificar</span>'
+        : ocupada
+          ? '<span class="badge-disponible badge-no">Ocupada</span>'
+          : '<span class="badge-disponible badge-ok">Disponible</span>';
+
+      card.innerHTML = `
+        <div class="check-badge">✓</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem;">
+          <span style="font-size:1.6rem;font-weight:900;color:var(--primary);">N° ${hab.numero}</span>
+          <span style="font-size:1.3rem;">${hab.icono}</span>
+        </div>
+        <div class="room-name">${hab.tipo}</div>
+        <div class="room-desc">${hab.desc} · ${hab.plazas} plaza${hab.plazas>1?'s':''}</div>
+        <div class="room-price">${fmt(hab.precio)} <span>/ noche</span></div>
+        ${badgeHtml}
+      `;
+
+      if (!ocupada) {
+        card.addEventListener('click', () => toggleRoom(hab, card));
       }
-    }
 
-    card.innerHTML = `
-      <div class="check-badge">✓</div>
-      <div class="room-icon">${tipo.icono}</div>
-      <div class="room-name">${tipo.nombre}</div>
-      <div class="room-desc">${tipo.desc}</div>
-      <div class="room-price">${fmt(tipo.precio)} <span>/ noche</span></div>
-      ${badgeHtml}
-    `;
-
-    if (!card.classList.contains('unavailable')) {
-      card.addEventListener('click', () => selectRoom(tipo, card));
-    }
-
-    grid.appendChild(card);
+      grid.appendChild(card);
+    });
   });
+
+  /* Nota multi-selección */
+  const nota = document.createElement('p');
+  nota.style.cssText = 'grid-column:1/-1; font-size:.8rem; color:var(--muted); margin-top:.5rem;';
+  nota.textContent   = '💡 Puedes seleccionar más de una habitación si necesitas varias.';
+  grid.appendChild(nota);
 
   updateDesayunoBox();
   $('btnContinuar2').disabled = true;
 }
 
-function selectRoom(tipo, cardEl) {
-  document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
-  cardEl.classList.add('selected');
-  state.tipoSel = tipo;
-  state.personasDesayuno = 0;
-  $('personasDesayunoNum').textContent = 0;
-  $('btnContinuar2').disabled = false;
-  $('desayunoBox').style.display = '';
+function toggleRoom(hab, cardEl) {
+  const idx = state.habsSel.findIndex(h => h.numero === hab.numero);
+  if (idx >= 0) {
+    /* Deseleccionar */
+    state.habsSel.splice(idx, 1);
+    cardEl.classList.remove('selected');
+  } else {
+    /* Seleccionar */
+    state.habsSel.push(hab);
+    cardEl.classList.add('selected');
+  }
+
+  /* Ajustar desayunos si supera el nuevo máximo */
+  const maxPlazas = maxPlazasSeleccionadas();
+  if (state.personasDesayuno > maxPlazas) {
+    state.personasDesayuno = maxPlazas;
+    $('personasDesayunoNum').textContent = maxPlazas;
+  }
+
+  $('btnContinuar2').disabled = state.habsSel.length === 0;
+  updateDesayunoBox();
   updateDesayunoInfo();
 }
 
 function updateDesayunoBox() {
-  $('desayunoBox').style.display = state.tipoSel ? '' : 'none';
+  $('desayunoBox').style.display = state.habsSel.length ? '' : 'none';
 }
 
 function updateDesayunoInfo() {
-  const p = state.personasDesayuno;
-  const tipo = state.tipoSel;
-  if (!tipo) return;
+  const p       = state.personasDesayuno;
+  const maxPlaz = maxPlazasSeleccionadas();
   if (p === 0) {
-    $('desayunoInfo').textContent = '$4.000 por persona / noche · Selecciona al menos 1 persona para incluir desayuno.';
+    $('desayunoInfo').textContent = `$4.000 por persona / noche · Máximo ${maxPlaz} persona${maxPlaz>1?'s':''} según habitaciones seleccionadas.`;
   } else {
     const subDes = PRECIO_DESAYUNO * p * state.noches;
     $('desayunoInfo').textContent = `${p} persona${p>1?'s':''} × $4.000 × ${state.noches} noche${state.noches>1?'s':''} = ${fmt(subDes)}`;
@@ -751,7 +783,7 @@ $('btnDejMenos').addEventListener('click', () => {
 });
 
 $('btnDejMas').addEventListener('click', () => {
-  const maxPlazas = state.tipoSel ? state.tipoSel.plazas : 4;
+  const maxPlazas = maxPlazasSeleccionadas() || 4;
   if (state.personasDesayuno < maxPlazas) {
     state.personasDesayuno++;
     $('personasDesayunoNum').textContent = state.personasDesayuno;
@@ -772,7 +804,8 @@ $('btnContinuar2').addEventListener('click', () => {
    ───────────────────────────────────────────────────── */
 function updateResumen() {
   const { subHab, subDes, total } = calcPrecio();
-  $('resHab').textContent     = state.tipoSel ? state.tipoSel.nombre : '—';
+  const habsTexto = state.habsSel.map(h => `Hab. ${h.numero} (${h.tipo})`).join(', ') || '—';
+  $('resHab').textContent      = habsTexto;
   $('resCheckin').textContent  = fmtDate(state.checkin);
   $('resCheckout').textContent = fmtDate(state.checkout);
   $('resNoches').textContent   = state.noches + (state.noches === 1 ? ' noche' : ' noches');
@@ -807,33 +840,26 @@ $('btnEnviar').addEventListener('click', async () => {
   const { subHab, subDes, total } = calcPrecio();
   const id = 'HDQ-' + Date.now().toString(36).toUpperCase();
 
-  // Seleccionar número de habitación (primer número disponible o TBD)
-  let numHab = 'TBD';
-  if (state.ocupadas !== null && state.tipoSel) {
-    const libre = state.tipoSel.numeros.find(n => !state.ocupadas.includes(n));
-    if (libre) numHab = libre;
-  }
-
   const reserva = {
     id,
-    estado:            'pendiente',
-    origen:            'Online',
-    registrado_por:    'Web',
-    huesped_nombre:    nombre,
-    huesped_email:     email,
-    huesped_telefono:  tel,
-    huesped_rut:       rut,
-    cliente:           empresa || nombre,
-    checkin:           state.checkin,
-    checkout:          state.checkout,
-    noches:            state.noches,
-    habitaciones: [{ numero: numHab, tipo: state.tipoSel.nombre }],
-    desayunos: { cantidad: state.personasDesayuno, precio_unitario: PRECIO_DESAYUNO },
-    subtotal_habs:     subHab,
+    estado:             'pendiente',
+    origen:             'Online',
+    registrado_por:     'Web',
+    huesped_nombre:     nombre,
+    huesped_email:      email,
+    huesped_telefono:   tel,
+    huesped_rut:        rut,
+    cliente:            empresa || nombre,
+    checkin:            state.checkin,
+    checkout:           state.checkout,
+    noches:             state.noches,
+    habitaciones:       state.habsSel.map(h => ({ numero: h.numero, tipo: h.tipo })),
+    desayunos:          { cantidad: state.personasDesayuno, precio_unitario: PRECIO_DESAYUNO },
+    subtotal_habs:      subHab,
     subtotal_desayunos: subDes,
-    descuento: { monto: 0, motivo: '' },
+    descuento:          { monto: 0, motivo: '' },
     total,
-    comentarios:       coment
+    comentarios:        coment
   };
 
   // UI: cargando
@@ -864,7 +890,7 @@ $('btnEnviar').addEventListener('click', async () => {
    ───────────────────────────────────────────────────── */
 $('btnOtraReserva').addEventListener('click', () => {
   // Limpiar estado
-  state = { checkin:'', checkout:'', noches:0, ocupadas:null, tipoSel:null, personasDesayuno:0 };
+  state = { checkin:'', checkout:'', noches:0, ocupadas:null, habsSel:[], personasDesayuno:0 };
   $('checkin').value   = '';
   $('checkout').value  = '';
   $('gNombre').value   = '';
