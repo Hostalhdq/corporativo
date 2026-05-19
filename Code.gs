@@ -410,7 +410,7 @@ function updateEstado(id, estado) {
    EMAIL — Notificación interna a David
    ────────────────────────────────────────────────── */
 function enviarNotificacionEmail(reserva) {
-  const destino = 'david@hostalhdq.cl';
+  const destino = 'davidquiero@gmail.com';
   const asunto  = '🏨 Nueva Reserva HDQ — ' + reserva.id;
   const cuerpo  = `
 Nueva reserva en Hostal HDQ.
@@ -456,7 +456,7 @@ function enviarEmailRecibo(r) {
     'Guarda este ID para cualquier consulta: ' + r.id + '\n\n' +
     'Hostal HDQ Concepción\n' +
     '📞 +56 9 8775 2280\n' +
-    '📧 david@hostalhdq.cl\n\n' +
+    '📧 davidquiero@gmail.com\n\n' +
     '(Mensaje automático — no respondas a este correo)';
   MailApp.sendEmail(destino, asunto, cuerpo);
 }
@@ -482,7 +482,7 @@ function enviarEmailConfirmacion(r) {
     'Total:        ' + total + '\n\n' +
     '── INFORMACIÓN DEL HOSTAL ──\n' +
     '📞 +56 9 8775 2280\n' +
-    '📧 david@hostalhdq.cl\n\n' +
+    '📧 davidquiero@gmail.com\n\n' +
     '¡Te esperamos en Hostal HDQ!\n\n' +
     '(Mensaje automático — no respondas a este correo)';
   MailApp.sendEmail(destino, asunto, cuerpo);

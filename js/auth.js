@@ -13,7 +13,7 @@ const AUTH = (() => {
       displayName: 'David — Hostal HDQ',
       shortName:   'David',
       origen:      'Teléfono',
-      email:       'david@hostalhdq.cl'
+      email:       'davidquiero@gmail.com'
     },
     /* ── Entorno 2: Staff ──────────────────────── */
     'nelson': {
@@ -22,7 +22,7 @@ const AUTH = (() => {
       displayName: 'Nelson — Hostal HDQ',
       shortName:   'Nelson',
       origen:      'Teléfono',
-      email:       'david@hostalhdq.cl'
+      email:       'davidquiero@gmail.com'
     },
     /* ── Entorno 3: Web / Cliente corporativo ──── */
     'sei-consultores': {
