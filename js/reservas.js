@@ -671,9 +671,7 @@ const CLIENTES = (() => {
     };
     all.push(nuevo);
     localStorage.setItem(KEY, JSON.stringify(all));
-    if (typeof SHEETS !== 'undefined') {
-      SHEETS.saveCliente(nuevo).catch(() => {});
-    }
+    _syncClienteSheets(nuevo);
     return id;
   }
 
@@ -688,9 +686,7 @@ const CLIENTES = (() => {
       fecha_actualizado: new Date().toISOString()
     };
     localStorage.setItem(KEY, JSON.stringify(all));
-    if (typeof SHEETS !== 'undefined') {
-      SHEETS.saveCliente(all[idx]).catch(() => {});
-    }
+    _syncClienteSheets(all[idx]);
     /* Actualiza huesped_* en todas las reservas vinculadas */
     _propagarCambiosCliente(id, all[idx]);
     return true;
@@ -707,6 +703,17 @@ const CLIENTES = (() => {
       if (c.telefono) { r.huesped_telefono = c.telefono; changed = true; }
     });
     if (changed) localStorage.setItem('hdq_reservas', JSON.stringify(reservas));
+  }
+
+  /* Sync seguro con Sheets — ignora si saveCliente no existe (caché) */
+  function _syncClienteSheets(c) {
+    try {
+      if (typeof SHEETS !== 'undefined' && typeof SHEETS.saveCliente === 'function') {
+        SHEETS.saveCliente(c).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[Clientes] Sheets sync error:', err);
+    }
   }
 
   function remove(id) {
