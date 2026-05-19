@@ -538,7 +538,7 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyIRVp3Ikj3OYDyVaJBe
 
 /* Habitaciones individuales agrupadas por piso */
 const HABITACIONES = [
-  { numero:'101', tipo:'Doble',          desc:'1 cama doble',                precio:35700, plazas:2, icono:'🛏️',      piso:1 },
+  { numero:'101', tipo:'2 Camas',         desc:'2 camas individuales',        precio:35700, plazas:2, icono:'🛏️🛏️', piso:1, nota:'Baño privado fuera de la habitación' },
   { numero:'102', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:1 },
   { numero:'103', tipo:'Doble 2 Camas',  desc:'2 camas individuales',        precio:40000, plazas:2, icono:'🛏️🛏️', piso:1 },
   { numero:'201', tipo:'Cuádruple',      desc:'2 camas dobles · 4 personas', precio:80000, plazas:4, icono:'🛏️🛏️', piso:2 },
@@ -715,6 +715,7 @@ function renderRooms() {
         <div class="room-desc">${hab.desc} · ${hab.plazas} plaza${hab.plazas>1?'s':''}</div>
         <div class="room-price">${fmt(hab.precio)} <span>/ noche</span></div>
         ${badgeHtml}
+        ${hab.nota ? `<div style="font-size:.72rem;color:var(--muted);margin-top:.4rem;">⚠️ ${hab.nota}</div>` : ''}
       `;
 
       if (!ocupada) {
