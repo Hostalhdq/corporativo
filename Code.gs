@@ -55,10 +55,11 @@ function doGet(e) {
   try {
     const action = (e.parameter.action || '').trim();
 
-    if (action === 'getAll')        return resp(getAllReservas());
-    if (action === 'getClientes')   return resp(getAllClientes());
-    if (action === 'updateEstado')  return resp(updateEstado(e.parameter.id, e.parameter.estado));
-    if (action === 'ping')          return resp({ ok: true, mensaje: 'Hostal HDQ API activa ✅' });
+    if (action === 'getAll')           return resp(getAllReservas());
+    if (action === 'getClientes')      return resp(getAllClientes());
+    if (action === 'updateEstado')     return resp(updateEstado(e.parameter.id, e.parameter.estado));
+    if (action === 'getDisponibilidad') return resp(getDisponibilidad(e.parameter.checkin, e.parameter.checkout));
+    if (action === 'ping')             return resp({ ok: true, mensaje: 'Hostal HDQ API activa ✅' });
 
     return resp({ ok: false, error: 'Acción no reconocida: ' + action });
 
@@ -284,6 +285,13 @@ function guardarReserva(r) {
         .setBackground('#f0f4f8');
   }
 
+  /* Email al huésped si viene de Online y tiene email */
+  if (r.origen === 'Online' && r.huesped_email) {
+    try { enviarEmailRecibo(r); } catch(ex) {}
+  }
+  /* Email a David */
+  try { enviarNotificacionEmail(r); } catch(ex) {}
+
   return { ok: true, id };
 }
 
@@ -328,6 +336,35 @@ function getAllReservas() {
 }
 
 /* ──────────────────────────────────────────────────
+   DISPONIBILIDAD — devuelve números de habitación ocupados
+   para el rango de fechas solicitado
+   ────────────────────────────────────────────────── */
+function getDisponibilidad(checkin, checkout) {
+  if (!checkin || !checkout) return { ok: false, error: 'Fechas requeridas.' };
+  const hoja  = getHojaReservas();
+  const datos = hoja.getDataRange().getValues();
+  const jsonCol = CABECERAS_RESERVAS.length;
+  const ocupadas = [];
+  for (let i = 1; i < datos.length; i++) {
+    const estado = String(datos[i][1] || '');
+    if (estado === 'cancelada') continue;
+    try {
+      const obj = JSON.parse(datos[i][jsonCol - 1] || '{}');
+      const ci  = String(obj.checkin  || '').slice(0, 10);
+      const co  = String(obj.checkout || '').slice(0, 10);
+      if (!ci || !co) continue;
+      /* Solapan si ci < checkout Y co > checkin */
+      if (ci < checkout && co > checkin) {
+        (obj.habitaciones || []).forEach(h => {
+          if (h.numero && h.numero !== 'TBD') ocupadas.push(String(h.numero));
+        });
+      }
+    } catch(e) {}
+  }
+  return { ok: true, ocupadas };
+}
+
+/* ──────────────────────────────────────────────────
    CAMBIAR ESTADO DE RESERVA
    ────────────────────────────────────────────────── */
 function updateEstado(id, estado) {
@@ -345,12 +382,22 @@ function updateEstado(id, estado) {
       if (bg) hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
 
       /* Actualizar también el _json con el nuevo estado */
+      const jsonCol = CABECERAS_RESERVAS.length;
       try {
-        const jsonCol = CABECERAS_RESERVAS.length;
         const obj = JSON.parse(datos[i][jsonCol - 1] || '{}');
         obj.estado = estado;
         hoja.getRange(i + 1, jsonCol).setValue(JSON.stringify(obj));
       } catch (e) {}
+
+      /* Email de confirmación al huésped */
+      if (estado === 'confirmada') {
+        try {
+          const objConf = JSON.parse(datos[i][jsonCol - 1] || '{}');
+          objConf.estado = 'confirmada';
+          objConf.id = id;
+          if (objConf.huesped_email) enviarEmailConfirmacion(objConf);
+        } catch(ex) {}
+      }
 
       return { ok: true };
     }
@@ -360,7 +407,7 @@ function updateEstado(id, estado) {
 }
 
 /* ──────────────────────────────────────────────────
-   NOTIFICACIÓN EMAIL (opcional)
+   EMAIL — Notificación interna a David
    ────────────────────────────────────────────────── */
 function enviarNotificacionEmail(reserva) {
   const destino = 'david@hostalhdq.cl';
@@ -382,5 +429,61 @@ Desayunos:    ${reserva.desayunos?.cantidad || 0} por día
 Total:        $${Number(reserva.total||0).toLocaleString('es-CL')} CLP
 Comentarios:  ${reserva.comentarios || '—'}
   `;
+  MailApp.sendEmail(destino, asunto, cuerpo);
+}
+
+/* ──────────────────────────────────────────────────
+   EMAIL — Recibo al huésped (solicitud recibida)
+   ────────────────────────────────────────────────── */
+function enviarEmailRecibo(r) {
+  const destino = r.huesped_email;
+  if (!destino) return;
+  const asunto = '✅ Solicitud recibida — Hostal HDQ | ' + r.id;
+  const tipo   = (r.habitaciones || []).map(h => h.tipo).join(', ') || '—';
+  const total  = '$' + Number(r.total || 0).toLocaleString('es-CL') + ' CLP';
+  const cuerpo =
+    'Hola ' + (r.huesped_nombre || 'estimado/a') + ',\n\n' +
+    'Hemos recibido tu solicitud de reserva en Hostal HDQ Concepción.\n\n' +
+    '── DETALLES DE TU SOLICITUD ──\n' +
+    'ID:           ' + r.id + '\n' +
+    'Check-in:     ' + r.checkin + '\n' +
+    'Check-out:    ' + r.checkout + '\n' +
+    'Noches:       ' + r.noches + '\n' +
+    'Habitación:   ' + tipo + '\n' +
+    'Total est.:   ' + total + '\n\n' +
+    '⏳ ESTADO: PENDIENTE DE CONFIRMACIÓN\n\n' +
+    'Tu reserva será revisada y recibirás un email de confirmación a la brevedad.\n' +
+    'Guarda este ID para cualquier consulta: ' + r.id + '\n\n' +
+    'Hostal HDQ Concepción\n' +
+    '📞 +56 9 8775 2280\n' +
+    '📧 david@hostalhdq.cl\n\n' +
+    '(Mensaje automático — no respondas a este correo)';
+  MailApp.sendEmail(destino, asunto, cuerpo);
+}
+
+/* ──────────────────────────────────────────────────
+   EMAIL — Confirmación al huésped (reserva confirmada)
+   ────────────────────────────────────────────────── */
+function enviarEmailConfirmacion(r) {
+  const destino = r.huesped_email;
+  if (!destino) return;
+  const asunto = '🏨 Reserva CONFIRMADA — Hostal HDQ | ' + r.id;
+  const tipo   = (r.habitaciones || []).map(h => h.tipo).join(', ') || '—';
+  const total  = '$' + Number(r.total || 0).toLocaleString('es-CL') + ' CLP';
+  const cuerpo =
+    'Hola ' + (r.huesped_nombre || 'estimado/a') + ',\n\n' +
+    '¡Tu reserva en Hostal HDQ Concepción ha sido CONFIRMADA! 🎉\n\n' +
+    '── DETALLES DE TU RESERVA ──\n' +
+    'ID:           ' + r.id + '\n' +
+    'Check-in:     ' + r.checkin + '\n' +
+    'Check-out:    ' + r.checkout + '\n' +
+    'Noches:       ' + r.noches + '\n' +
+    'Habitación:   ' + tipo + '\n' +
+    'Total:        ' + total + '\n\n' +
+    '── INFORMACIÓN DEL HOSTAL ──\n' +
+    '📞 +56 9 8775 2280\n' +
+    '📧 david@hostalhdq.cl\n\n' +
+    '¡Te esperamos en Hostal HDQ!\n\n' +
+    '(Mensaje automático — no respondas a este correo)';
   MailApp.sendEmail(destino, asunto, cuerpo);
 }
