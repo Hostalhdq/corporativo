@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="es" style="visibility:hidden">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EMAT — Hostal HDQ</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth.js"></script>
+  <script src="js/sheets.js"></script>
+  <script>AUTH.requireAuth(['owner']);</script>
+  <style>
+    /* ─── EMAT Form Styles ─── */
+    .emat-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+    }
+
+    .emat-header {
+      text-align: center;
+      border: 2px solid #003366;
+      padding: 12px;
+      margin-bottom: 20px;
+      background: #f0f4ff;
+    }
+
+    .emat-header h1 {
+      font-size: 16px;
+      font-weight: bold;
+      color: #003366;
+      margin: 0 0 4px 0;
+    }
+
+    .emat-header p {
+      font-size: 13px;
+      margin: 2px 0;
+      color: #333;
+    }
+
+    .emat-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #fff8e1;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+    }
+
+    .emat-controls label {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .emat-controls select,
+    .emat-controls input[type="number"] {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .btn-calcular {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .btn-calcular:hover { background: #0052a3; }
+
+    .btn-guardar-config {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-guardar-config:hover { background: #1e7e34; }
+
+    .btn-imprimir {
+      background: #6f42c1;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-imprimir:hover { background: #5a32a3; }
+
+    /* Sections */
+    .emat-section {
+      border: 1px solid #003366;
+      margin-bottom: 16px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .emat-section-title {
+      background: #003366;
+      color: white;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 8px 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .emat-section-body {
+      padding: 12px;
+      background: white;
+    }
+
+    /* Fields */
+    .emat-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .emat-row label {
+      font-size: 12px;
+      color: #333;
+      min-width: 220px;
+      font-weight: 600;
+    }
+
+    .emat-field-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .emat-input {
+      flex: 1;
+      min-width: 180px;
+      padding: 5px 8px;
+      border: 1px solid #aaa;
+      border-radius: 3px;
+      font-size: 13px;
+      background: white;
+    }
+
+    .emat-input.auto-calc {
+      background: #e3f2fd;
+      border-color: #1976d2;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .badge-auto {
+      background: #1976d2;
+      color: white;
+    }
+
+    .badge-manual {
+      background: #888;
+      color: white;
+    }
+
+    /* Grid for 2-column layout */
+    .emat-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+
+    /* Table */
+    .emat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .emat-table th {
+      background: #003366;
+      color: white;
+      padding: 6px 8px;
+      text-align: center;
+      border: 1px solid #002244;
+    }
+
+    .emat-table td {
+      border: 1px solid #aaa;
+      padding: 5px 8px;
+      text-align: center;
+    }
+
+    .emat-table tr:nth-child(even) td { background: #f9f9f9; }
+    .emat-table td:first-child { text-align: left; }
+    .emat-table .total-row td {
+      font-weight: bold;
+      background: #e8f0fe;
+    }
+
+    .emat-table input[type="number"],
+    .emat-table input[type="text"] {
+      width: 90%;
+      padding: 3px 5px;
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .emat-table input.auto-calc {
+      background: #e3f2fd;
+      border-color: #1976d2;
+    }
+
+    .emat-note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    .alert-no-reservas {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #856404;
+      margin-top: 8px;
+    }
+
+    .alert-iva {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #856404;
+      margin-top: 8px;
+    }
+
+    .emat-total-row {
+      font-weight: bold;
+    }
+
+    .print-header {
+      display: none;
+    }
+
+    /* ─── PRINT STYLES ─── */
+    @media print {
+      body { visibility: visible !important; }
+      html { visibility: visible !important; }
+
+      .sidebar,
+      .topbar,
+      .emat-controls,
+      .no-print {
+        display: none !important;
+      }
+
+      .layout {
+        display: block !important;
+      }
+
+      .main-content, .content-area {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+
+      .emat-container {
+        max-width: 100%;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        font-size: 10pt;
+      }
+
+      .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #003366;
+        padding-bottom: 8px;
+      }
+
+      .print-header h2 {
+        font-size: 14pt;
+        margin: 0 0 4px 0;
+        color: #003366;
+      }
+
+      .print-header p {
+        font-size: 10pt;
+        margin: 2px 0;
+        color: #333;
+      }
+
+      .emat-header {
+        display: none;
+      }
+
+      .emat-section {
+        border: 1px solid #333;
+        margin-bottom: 10px;
+        page-break-inside: avoid;
+      }
+
+      .emat-section-title {
+        background: #333 !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .emat-section.page-break-before {
+        page-break-before: always;
+      }
+
+      .emat-input {
+        border: none;
+        border-bottom: 1px solid #333;
+        border-radius: 0;
+        background: transparent !important;
+        padding: 2px 4px;
+        font-size: 10pt;
+      }
+
+      .emat-input.auto-calc {
+        background: transparent !important;
+        border-color: #333;
+      }
+
+      .badge { display: none; }
+
+      .emat-table input[type="number"],
+      .emat-table input[type="text"] {
+        border: none;
+        border-bottom: 1px solid #333;
+        background: transparent !important;
+        font-size: 10pt;
+        text-align: center;
+      }
+
+      .emat-table input.auto-calc {
+        background: transparent !important;
+      }
+
+      .emat-table th {
+        background: #333 !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .emat-table .total-row td {
+        background: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body {
+        margin: 1cm;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">🏨 HDQ</div>
+      <div class="client-name" id="sidebar-username">…</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-avatar">👤</div>
+        <div class="user-details">
+          <div class="name" id="sidebar-username-footer">…</div>
+          <div class="role" id="sidebar-role">…</div>
+        </div>
+      </div>
+      <button class="btn-logout" id="btn-logout">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="topbar-title">EMAT — INE</span>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbar-date"></span>
+      </div>
+    </header>
+    <main class="page-content">
+
+      <div class="emat-container">
+
+        <!-- Print Header (only visible when printing) -->
+        <div class="print-header" id="print-header">
+          <h2>HOSTAL HDQ — FORMULARIO EMAT INE</h2>
+          <p id="print-periodo"></p>
+          <p id="print-fecha-emision"></p>
+        </div>
+
+        <!-- Screen Header -->
+        <div class="emat-header">
+          <h1>FORMULARIO EMAT — Encuesta Mensual Establecimientos de Alojamiento Turístico</h1>
+          <p>Instituto Nacional de Estadísticas (INE) · Hostal HDQ Concepción</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="emat-controls no-print">
+          <label>Mes:</label>
+          <select id="sel-mes">
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+
+          <label>Año:</label>
+          <input type="number" id="sel-anio" value="2026" min="2020" max="2030" style="width:80px" />
+
+          <button class="btn-calcular" onclick="calcularEMAT()">⚡ Calcular desde reservas</button>
+          <button class="btn-guardar-config" onclick="guardarConfigHostal()">💾 Guardar config hostal</button>
+          <button class="btn-imprimir" onclick="imprimirEMAT()">🖨️ Imprimir / Guardar PDF</button>
+        </div>
+
+        <!-- SECCIÓN A — Identificación -->
+        <div class="emat-section">
+          <div class="emat-section-title">SECCIÓN A — Identificación del Establecimiento</div>
+          <div class="emat-section-body">
+            <div class="emat-grid-2">
+              <div class="emat-row">
+                <label>RUT Establecimiento:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-rut" placeholder="76.XXX.XXX-X" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Nombre o Razón Social:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-razon-social" value="Hostal HDQ" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Nombre Comercial:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-nombre-comercial" value="Hostal HDQ" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Dirección:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-direccion" placeholder="Calle, número" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Teléfono:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-telefono" placeholder="+56 9 XXXX XXXX" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Email:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="email" id="a-email" value="david@hostalhdq.cl" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Página Web:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-web" placeholder="www.hostalhdq.cl" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Región:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-region" value="VIII Biobío" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Comuna:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-comuna" value="Concepción" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Nombre Representante Legal:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-rep-legal" placeholder="Nombre completo" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>RUT Representante Legal:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="a-rut-rep" placeholder="XX.XXX.XXX-X" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Días de Funcionamiento en el mes:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="number" id="a-dias-func" min="1" max="31" value="30" />
+                  <span class="badge badge-auto" id="badge-dias-func">✅ Auto</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN B — Capacidad Ofrecida -->
+        <div class="emat-section">
+          <div class="emat-section-title">SECCIÓN B — Capacidad Ofrecida</div>
+          <div class="emat-section-body">
+            <table class="emat-table">
+              <thead>
+                <tr>
+                  <th>Tipo de Unidad</th>
+                  <th>N° de Unidades</th>
+                  <th>N° de Plazas</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Habitaciones</td>
+                  <td><input type="number" id="b-hab-unidades" class="auto-calc" value="10" /></td>
+                  <td><input type="number" id="b-hab-plazas" class="auto-calc" value="29" /></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+                <tr>
+                  <td>Cabañas</td>
+                  <td><input type="number" id="b-cab-unidades" value="0" /></td>
+                  <td><input type="number" id="b-cab-plazas" value="0" /></td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr>
+                  <td>Departamentos</td>
+                  <td><input type="number" id="b-dep-unidades" value="0" /></td>
+                  <td><input type="number" id="b-dep-plazas" value="0" /></td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr>
+                  <td>Camping (sitios)</td>
+                  <td><input type="number" id="b-camp-unidades" value="0" /></td>
+                  <td><input type="number" id="b-camp-plazas" value="0" /></td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr class="total-row">
+                  <td><strong>TOTAL</strong></td>
+                  <td id="b-total-unidades"><strong>10</strong></td>
+                  <td id="b-total-plazas"><strong>29</strong></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="emat-note">Detalle habitaciones: 101-Doble(2), 102-Cuádruple(4), 103-Doble 2 Camas(2), 201-Cuádruple(4), 202-Matrimonial(2), 203-Matrimonial(2), 204-2 Camas(2), 205-Triple(3), 206-Cuádruple(4), 207-Cuádruple(4) = 10 hab / 29 plazas</p>
+          </div>
+        </div>
+
+        <!-- SECCIÓN C — Personal Ocupado -->
+        <div class="emat-section">
+          <div class="emat-section-title">SECCIÓN C — Personal Ocupado</div>
+          <div class="emat-section-body">
+            <table class="emat-table">
+              <thead>
+                <tr>
+                  <th>Categoría</th>
+                  <th>Hombre</th>
+                  <th>Mujer</th>
+                  <th>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Personal Permanente</td>
+                  <td><input type="number" id="c-perm-h" value="2" min="0" onchange="actualizarTotalPersonal()" /></td>
+                  <td><input type="number" id="c-perm-m" value="1" min="0" onchange="actualizarTotalPersonal()" /></td>
+                  <td id="c-perm-total">3</td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr>
+                  <td>Personal Eventual</td>
+                  <td><input type="number" id="c-even-h" value="0" min="0" onchange="actualizarTotalPersonal()" /></td>
+                  <td><input type="number" id="c-even-m" value="0" min="0" onchange="actualizarTotalPersonal()" /></td>
+                  <td id="c-even-total">0</td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr class="total-row">
+                  <td><strong>TOTAL</strong></td>
+                  <td id="c-total-h"><strong>2</strong></td>
+                  <td id="c-total-m"><strong>1</strong></td>
+                  <td id="c-total-total"><strong>3</strong></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECCIÓN D — Movimiento de Pasajeros -->
+        <div class="emat-section page-break-before">
+          <div class="emat-section-title">SECCIÓN D — Movimiento de Pasajeros</div>
+          <div class="emat-section-body">
+            <div id="d-alerta-no-reservas" style="display:none">
+              <div class="alert-no-reservas">⚠️ No se encontraron reservas para el período seleccionado. Complete los campos manualmente o seleccione otro mes.</div>
+            </div>
+
+            <table class="emat-table">
+              <thead>
+                <tr>
+                  <th rowspan="2">Procedencia de Pasajeros</th>
+                  <th colspan="2">Llegadas</th>
+                  <th colspan="2">Pernoctaciones</th>
+                </tr>
+                <tr>
+                  <th>N°</th>
+                  <th>%</th>
+                  <th>N°</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Residentes en Chile</strong></td>
+                  <td><input type="number" id="d-chl-llegadas" class="auto-calc" value="0" onchange="actualizarPorcentajes()" /></td>
+                  <td id="d-chl-llegadas-pct">0%</td>
+                  <td><input type="number" id="d-chl-pernoc" class="auto-calc" value="0" onchange="actualizarPorcentajes()" /></td>
+                  <td id="d-chl-pernoc-pct">0%</td>
+                </tr>
+                <tr>
+                  <td style="padding-left:20px; font-size:11px;">↳ Nota: Distribución por región completar manualmente</td>
+                  <td colspan="4" style="text-align:left; font-size:11px; color:#666;">
+                    Región VIII Biobío: <input type="number" style="width:60px" id="d-region-llegadas" value="0" />
+                    &nbsp;|&nbsp; Otras regiones: <input type="number" style="width:60px" id="d-otras-llegadas" value="0" />
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Residentes en el Extranjero</strong></td>
+                  <td><input type="number" id="d-ext-llegadas" class="auto-calc" value="0" onchange="actualizarPorcentajes()" /></td>
+                  <td id="d-ext-llegadas-pct">0%</td>
+                  <td><input type="number" id="d-ext-pernoc" class="auto-calc" value="0" onchange="actualizarPorcentajes()" /></td>
+                  <td id="d-ext-pernoc-pct">0%</td>
+                </tr>
+                <tr>
+                  <td style="padding-left:20px; font-size:11px;">↳ Distribución por país de residencia:</td>
+                  <td colspan="4">
+                    <div id="d-paises-wrapper" style="font-size:11px;">
+                      <span style="color:#888">Completar si hay huéspedes extranjeros</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr class="total-row">
+                  <td><strong>TOTAL</strong></td>
+                  <td id="d-total-llegadas"><strong>0</strong></td>
+                  <td>100%</td>
+                  <td id="d-total-pernoc"><strong>0</strong></td>
+                  <td>100%</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="emat-note">✅ Auto: calculado desde reservas con check-in en el período. Llegadas = número de reservas; Pernoctaciones = suma de noches × huéspedes.</p>
+            <p class="emat-note">La distinción nacional/extranjero se basa en el formato del RUT: formato chileno (XX.XXX.XXX-X) → residente en Chile; sin RUT o formato extranjero → extranjero.</p>
+          </div>
+        </div>
+
+        <!-- SECCIÓN E — Ocupación -->
+        <div class="emat-section">
+          <div class="emat-section-title">SECCIÓN E — Ocupación de Unidades</div>
+          <div class="emat-section-body">
+            <table class="emat-table">
+              <thead>
+                <tr>
+                  <th>Indicador</th>
+                  <th>Valor</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Noches ocupadas (Room Nights) del período</td>
+                  <td><input type="number" id="e-room-nights" class="auto-calc" value="0" /></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+                <tr>
+                  <td>Plazas adicionales instaladas (camas extra)</td>
+                  <td><input type="number" id="e-plazas-adicionales" value="0" /></td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr class="total-row">
+                  <td>Capacidad total ofrecida (plazas × días funcionamiento)</td>
+                  <td id="e-cap-total"><strong>0</strong></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+                <tr>
+                  <td>Tasa de ocupación estimada (%)</td>
+                  <td id="e-tasa-ocupacion"><strong>0%</strong></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="emat-note">Room Nights = suma de (noches × número de habitaciones) por reserva del período.</p>
+          </div>
+        </div>
+
+        <!-- SECCIÓN F — Ingresos Netos -->
+        <div class="emat-section page-break-before">
+          <div class="emat-section-title">SECCIÓN F — Ingresos Netos de Operación (Excluye IVA)</div>
+          <div class="emat-section-body">
+            <div class="alert-iva">
+              ⚠️ <strong>Verificar si los montos ya excluyen IVA.</strong> Si el sistema registra precios con IVA incluido, divida por 1.19 para obtener el neto.
+            </div>
+            <table class="emat-table" style="margin-top:12px">
+              <thead>
+                <tr>
+                  <th>Concepto</th>
+                  <th>Monto ($)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Ingreso neto por alojamiento</td>
+                  <td><input type="number" id="f-ing-alojamiento" class="auto-calc" value="0" onchange="actualizarTotalIngresos()" /></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+                <tr>
+                  <td>Ingreso neto por otros servicios (desayunos, etc.)</td>
+                  <td><input type="number" id="f-ing-otros" class="auto-calc" value="0" onchange="actualizarTotalIngresos()" /></td>
+                  <td><span class="badge badge-auto">✅ Auto</span></td>
+                </tr>
+                <tr>
+                  <td>Otros ingresos (estacionamiento, lavandería, etc.)</td>
+                  <td><input type="number" id="f-ing-extra" value="0" onchange="actualizarTotalIngresos()" /></td>
+                  <td><span class="badge badge-manual">✏️ Manual</span></td>
+                </tr>
+                <tr class="total-row">
+                  <td><strong>TOTAL INGRESO NETO OPERACIONAL</strong></td>
+                  <td id="f-total-ingresos"><strong>$0</strong></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="emat-note">Auto-calculado desde reservas del período. Alojamiento = total reserva − subtotal desayunos. Otros = subtotal desayunos.</p>
+          </div>
+        </div>
+
+        <!-- CERTIFICACIÓN -->
+        <div class="emat-section">
+          <div class="emat-section-title">CERTIFICACIÓN — Datos del Informante</div>
+          <div class="emat-section-body">
+            <div class="emat-grid-2">
+              <div class="emat-row">
+                <label>Nombre del Informante:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="cert-nombre" placeholder="Nombre completo" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Cargo:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="cert-cargo" placeholder="Ej: Propietario" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Email del Informante:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="email" id="cert-email" placeholder="correo@ejemplo.cl" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Teléfono Red Fija:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="cert-tel-fijo" placeholder="+56 41 XXX XXXX" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+              <div class="emat-row">
+                <label>Teléfono Celular:</label>
+                <div class="emat-field-wrapper">
+                  <input class="emat-input" type="text" id="cert-tel-cel" placeholder="+56 9 XXXX XXXX" />
+                  <span class="badge badge-manual">✏️ Manual</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:20px; border-top:1px solid #ccc; padding-top:16px; display:flex; justify-content:space-between;">
+              <div style="text-align:center;">
+                <div style="border-top:1px solid #333; width:200px; padding-top:4px; font-size:11px;">Firma del Informante</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="border-top:1px solid #333; width:200px; padding-top:4px; font-size:11px;">Fecha</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="border-top:1px solid #333; width:200px; padding-top:4px; font-size:11px;">Sello del Establecimiento</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /emat-container -->
+    </main>
+  </div><!-- /main-content -->
+</div><!-- /layout -->
+
+<script src="js/reservas.js"></script>
+<script>
+// ─── Constantes del Hostal ────────────────────────────────────────────────
+const HABITACIONES_HDQ = {
+  '101': { tipo: 'Doble',         plazas: 2 },
+  '102': { tipo: 'Cuádruple',     plazas: 4 },
+  '103': { tipo: 'Doble 2 Camas', plazas: 2 },
+  '201': { tipo: 'Cuádruple',     plazas: 4 },
+  '202': { tipo: 'Matrimonial',   plazas: 2 },
+  '203': { tipo: 'Matrimonial',   plazas: 2 },
+  '204': { tipo: '2 Camas',       plazas: 2 },
+  '205': { tipo: 'Triple',        plazas: 3 },
+  '206': { tipo: 'Cuádruple',     plazas: 4 },
+  '207': { tipo: 'Cuádruple',     plazas: 4 }
+};
+
+const TOTAL_HABITACIONES = Object.keys(HABITACIONES_HDQ).length; // 10
+const TOTAL_PLAZAS = Object.values(HABITACIONES_HDQ).reduce((s, h) => s + h.plazas, 0); // 29
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const STORAGE_KEY = 'hdq_emat_config';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function diasEnMes(mes, anio) {
+  return new Date(anio, mes, 0).getDate();
+}
+
+function esRutChileno(rut) {
+  if (!rut) return false;
+  return /^\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]$/.test(rut.trim());
+}
+
+function formatCLP(n) {
+  return '$' + Math.round(n).toLocaleString('es-CL');
+}
+
+function setAutoField(id, value) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.value = value;
+    el.classList.add('auto-calc');
+  }
+}
+
+// ─── Guardar / Cargar Configuración ──────────────────────────────────────
+function guardarConfigHostal() {
+  const config = {
+    rut:              document.getElementById('a-rut').value,
+    razonSocial:      document.getElementById('a-razon-social').value,
+    nombreComercial:  document.getElementById('a-nombre-comercial').value,
+    direccion:        document.getElementById('a-direccion').value,
+    telefono:         document.getElementById('a-telefono').value,
+    email:            document.getElementById('a-email').value,
+    web:              document.getElementById('a-web').value,
+    region:           document.getElementById('a-region').value,
+    comuna:           document.getElementById('a-comuna').value,
+    repLegal:         document.getElementById('a-rep-legal').value,
+    rutRep:           document.getElementById('a-rut-rep').value,
+    certNombre:       document.getElementById('cert-nombre').value,
+    certCargo:        document.getElementById('cert-cargo').value,
+    certEmail:        document.getElementById('cert-email').value,
+    certTelFijo:      document.getElementById('cert-tel-fijo').value,
+    certTelCel:       document.getElementById('cert-tel-cel').value
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  alert('✅ Configuración del hostal guardada.');
+}
+
+function cargarConfigHostal() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const c = JSON.parse(raw);
+    if (c.rut)             document.getElementById('a-rut').value            = c.rut;
+    if (c.razonSocial)     document.getElementById('a-razon-social').value   = c.razonSocial;
+    if (c.nombreComercial) document.getElementById('a-nombre-comercial').value = c.nombreComercial;
+    if (c.direccion)       document.getElementById('a-direccion').value      = c.direccion;
+    if (c.telefono)        document.getElementById('a-telefono').value       = c.telefono;
+    if (c.email)           document.getElementById('a-email').value          = c.email;
+    if (c.web)             document.getElementById('a-web').value            = c.web;
+    if (c.region)          document.getElementById('a-region').value         = c.region;
+    if (c.comuna)          document.getElementById('a-comuna').value         = c.comuna;
+    if (c.repLegal)        document.getElementById('a-rep-legal').value      = c.repLegal;
+    if (c.rutRep)          document.getElementById('a-rut-rep').value        = c.rutRep;
+    if (c.certNombre)      document.getElementById('cert-nombre').value      = c.certNombre;
+    if (c.certCargo)       document.getElementById('cert-cargo').value       = c.certCargo;
+    if (c.certEmail)       document.getElementById('cert-email').value       = c.certEmail;
+    if (c.certTelFijo)     document.getElementById('cert-tel-fijo').value    = c.certTelFijo;
+    if (c.certTelCel)      document.getElementById('cert-tel-cel').value     = c.certTelCel;
+  } catch(e) {
+    console.warn('Error cargando config EMAT:', e);
+  }
+}
+
+// ─── Actualizar totales de personal ──────────────────────────────────────
+function actualizarTotalPersonal() {
+  const ph = parseInt(document.getElementById('c-perm-h').value) || 0;
+  const pm = parseInt(document.getElementById('c-perm-m').value) || 0;
+  const eh = parseInt(document.getElementById('c-even-h').value) || 0;
+  const em = parseInt(document.getElementById('c-even-m').value) || 0;
+
+  document.getElementById('c-perm-total').textContent = ph + pm;
+  document.getElementById('c-even-total').textContent = eh + em;
+  document.getElementById('c-total-h').innerHTML = '<strong>' + (ph + eh) + '</strong>';
+  document.getElementById('c-total-m').innerHTML = '<strong>' + (pm + em) + '</strong>';
+  document.getElementById('c-total-total').innerHTML = '<strong>' + (ph + pm + eh + em) + '</strong>';
+}
+
+// ─── Actualizar porcentajes sección D ────────────────────────────────────
+function actualizarPorcentajes() {
+  const chlL = parseInt(document.getElementById('d-chl-llegadas').value) || 0;
+  const extL = parseInt(document.getElementById('d-ext-llegadas').value) || 0;
+  const chlP = parseInt(document.getElementById('d-chl-pernoc').value) || 0;
+  const extP = parseInt(document.getElementById('d-ext-pernoc').value) || 0;
+
+  const totL = chlL + extL;
+  const totP = chlP + extP;
+
+  document.getElementById('d-chl-llegadas-pct').textContent = totL > 0 ? Math.round(chlL/totL*100) + '%' : '0%';
+  document.getElementById('d-ext-llegadas-pct').textContent = totL > 0 ? Math.round(extL/totL*100) + '%' : '0%';
+  document.getElementById('d-chl-pernoc-pct').textContent  = totP > 0 ? Math.round(chlP/totP*100) + '%' : '0%';
+  document.getElementById('d-ext-pernoc-pct').textContent  = totP > 0 ? Math.round(extP/totP*100) + '%' : '0%';
+
+  document.getElementById('d-total-llegadas').innerHTML = '<strong>' + totL + '</strong>';
+  document.getElementById('d-total-pernoc').innerHTML   = '<strong>' + totP + '</strong>';
+}
+
+// ─── Actualizar totales de ingresos ──────────────────────────────────────
+function actualizarTotalIngresos() {
+  const aloj  = parseFloat(document.getElementById('f-ing-alojamiento').value) || 0;
+  const otros = parseFloat(document.getElementById('f-ing-otros').value) || 0;
+  const extra = parseFloat(document.getElementById('f-ing-extra').value) || 0;
+  const total = aloj + otros + extra;
+  document.getElementById('f-total-ingresos').innerHTML = '<strong>' + formatCLP(total) + '</strong>';
+}
+
+// ─── Actualizar totales de capacidad sección B ───────────────────────────
+function actualizarTotalesCapacidad() {
+  const habU = parseInt(document.getElementById('b-hab-unidades').value) || 0;
+  const habP = parseInt(document.getElementById('b-hab-plazas').value) || 0;
+  const cabU = parseInt(document.getElementById('b-cab-unidades').value) || 0;
+  const cabP = parseInt(document.getElementById('b-cab-plazas').value) || 0;
+  const depU = parseInt(document.getElementById('b-dep-unidades').value) || 0;
+  const depP = parseInt(document.getElementById('b-dep-plazas').value) || 0;
+  const camU = parseInt(document.getElementById('b-camp-unidades').value) || 0;
+  const camP = parseInt(document.getElementById('b-camp-plazas').value) || 0;
+
+  document.getElementById('b-total-unidades').innerHTML = '<strong>' + (habU+cabU+depU+camU) + '</strong>';
+  document.getElementById('b-total-plazas').innerHTML   = '<strong>' + (habP+cabP+depP+camP) + '</strong>';
+}
+
+// ─── Calcular desde Reservas ──────────────────────────────────────────────
+function calcularEMAT() {
+  const mes  = parseInt(document.getElementById('sel-mes').value);   // 1-12
+  const anio = parseInt(document.getElementById('sel-anio').value);
+
+  // Auto: días de funcionamiento
+  const dias = diasEnMes(mes, anio);
+  const inputDias = document.getElementById('a-dias-func');
+  inputDias.value = dias;
+  inputDias.classList.add('auto-calc');
+  document.getElementById('badge-dias-func').textContent = '✅ Auto';
+
+  // Obtener reservas
+  let todasReservas = [];
+  try {
+    if (typeof RESERVAS !== 'undefined' && typeof RESERVAS.getAll === 'function') {
+      todasReservas = RESERVAS.getAll();
+    }
+  } catch(e) {
+    console.warn('No se pudo acceder a RESERVAS:', e);
+  }
+
+  // Filtrar reservas del mes (check-in en el mes/año, estado != cancelada)
+  const reservasMes = todasReservas.filter(r => {
+    if (r.estado === 'cancelada' || r.estado === 'cancelado') return false;
+    const ci = new Date(r.checkin);
+    return ci.getFullYear() === anio && (ci.getMonth() + 1) === mes;
+  });
+
+  const hayReservas = reservasMes.length > 0;
+  document.getElementById('d-alerta-no-reservas').style.display = hayReservas ? 'none' : 'block';
+
+  // Contadores
+  let llegadasChl = 0, llegadasExt = 0;
+  let pernocChl = 0, pernocExt = 0;
+  let roomNights = 0;
+  let ingAlojamiento = 0, ingOtros = 0;
+  const paisesFrecuencia = {};
+
+  reservasMes.forEach(r => {
+    // Noches de la reserva
+    const ci = new Date(r.checkin);
+    const co = new Date(r.checkout || r.checkin);
+    const noches = Math.max(1, Math.round((co - ci) / 86400000));
+
+    // Huéspedes: intentar obtener del campo desayunos o de un campo guests
+    let guests = 1;
+    if (r.desayunos && typeof r.desayunos === 'object' && r.desayunos.cantidad > 0) {
+      guests = r.desayunos.cantidad;
+    } else if (r.huespedes && r.huespedes > 0) {
+      guests = r.huespedes;
+    } else if (r.guests && r.guests > 0) {
+      guests = r.guests;
+    }
+
+    // Habitaciones de la reserva
+    let numHabs = 1;
+    if (Array.isArray(r.habitaciones)) {
+      numHabs = r.habitaciones.length || 1;
+    }
+
+    // Room nights
+    roomNights += numHabs * noches;
+
+    // Pernoctaciones = guests × noches
+    const pernoc = guests * noches;
+
+    // Nacional vs extranjero
+    const rut = r.huesped_rut || r.rut || r.rut_huesped || '';
+    const esChl = esRutChileno(rut);
+
+    if (esChl) {
+      llegadasChl++;
+      pernocChl += pernoc;
+    } else {
+      llegadasExt++;
+      pernocExt += pernoc;
+      // País
+      const pais = r.pais || r.nacionalidad || 'No especificado';
+      paisesFrecuencia[pais] = (paisesFrecuencia[pais] || 0) + 1;
+    }
+
+    // Ingresos
+    if (r.subtotal_habs !== undefined) {
+      ingAlojamiento += parseFloat(r.subtotal_habs) || 0;
+    } else if (r.total !== undefined && r.subtotal_desayunos !== undefined) {
+      ingAlojamiento += (parseFloat(r.total) || 0) - (parseFloat(r.subtotal_desayunos) || 0);
+    } else if (r.total !== undefined) {
+      ingAlojamiento += parseFloat(r.total) || 0;
+    }
+
+    if (r.subtotal_desayunos !== undefined) {
+      ingOtros += parseFloat(r.subtotal_desayunos) || 0;
+    }
+  });
+
+  // Poblar Sección D
+  setAutoField('d-chl-llegadas', llegadasChl);
+  setAutoField('d-chl-pernoc', pernocChl);
+  setAutoField('d-ext-llegadas', llegadasExt);
+  setAutoField('d-ext-pernoc', pernocExt);
+  actualizarPorcentajes();
+
+  // Países extranjeros
+  if (llegadasExt > 0) {
+    const wrapper = document.getElementById('d-paises-wrapper');
+    let html = '<table style="font-size:11px; border-collapse:collapse; margin-top:4px"><tr><th style="padding:2px 8px; border:1px solid #ccc">País</th><th style="padding:2px 8px; border:1px solid #ccc">Llegadas</th></tr>';
+    Object.entries(paisesFrecuencia).sort((a,b) => b[1]-a[1]).forEach(([pais, cnt]) => {
+      html += `<tr><td style="padding:2px 8px; border:1px solid #ccc">${pais}</td><td style="padding:2px 8px; border:1px solid #ccc; text-align:center">${cnt}</td></tr>`;
+    });
+    html += '</table>';
+    wrapper.innerHTML = html;
+  }
+
+  // Sección E
+  setAutoField('e-room-nights', roomNights);
+
+  const plazasTotales = parseInt(document.getElementById('b-hab-plazas').value) || TOTAL_PLAZAS;
+  const plazasAdic = parseInt(document.getElementById('e-plazas-adicionales').value) || 0;
+  const capTotal = (plazasTotales + plazasAdic) * dias;
+  document.getElementById('e-cap-total').innerHTML = '<strong>' + capTotal.toLocaleString('es-CL') + '</strong>';
+
+  const pernocTotal = pernocChl + pernocExt;
+  const tasaOcup = capTotal > 0 ? Math.round(pernocTotal / capTotal * 100) : 0;
+  document.getElementById('e-tasa-ocupacion').innerHTML = '<strong>' + tasaOcup + '%</strong>';
+
+  // Sección F
+  setAutoField('f-ing-alojamiento', Math.round(ingAlojamiento));
+  setAutoField('f-ing-otros', Math.round(ingOtros));
+  actualizarTotalIngresos();
+
+  // Actualizar encabezado de impresión
+  const nombreMes = MESES[mes - 1];
+  document.getElementById('print-periodo').textContent = 'Período: ' + nombreMes + ' ' + anio;
+  document.getElementById('print-fecha-emision').textContent = 'Fecha de emisión: ' + new Date().toLocaleDateString('es-CL', {day:'2-digit', month:'long', year:'numeric'});
+
+  if (hayReservas) {
+    alert('✅ Cálculo completado.\n' +
+          'Reservas del período: ' + reservasMes.length + '\n' +
+          'Llegadas nacionales: ' + llegadasChl + '\n' +
+          'Llegadas extranjeros: ' + llegadasExt + '\n' +
+          'Room Nights: ' + roomNights);
+  }
+}
+
+// ─── Imprimir ─────────────────────────────────────────────────────────────
+function imprimirEMAT() {
+  const mes  = parseInt(document.getElementById('sel-mes').value);
+  const anio = parseInt(document.getElementById('sel-anio').value);
+  const nombreMes = MESES[mes - 1];
+
+  document.getElementById('print-periodo').textContent = 'Período: ' + nombreMes + ' ' + anio;
+  document.getElementById('print-fecha-emision').textContent = 'Fecha de emisión: ' + new Date().toLocaleDateString('es-CL', {day:'2-digit', month:'long', year:'numeric'});
+
+  window.print();
+}
+
+// ─── Inicialización ───────────────────────────────────────────────────────
+function initEMAT() {
+  // Default: mes anterior al actual
+  const hoy = new Date();
+  let mesDef = hoy.getMonth(); // 0-based → mes anterior
+  let anioDef = hoy.getFullYear();
+  if (mesDef === 0) { mesDef = 12; anioDef--; }
+
+  document.getElementById('sel-mes').value  = mesDef;
+  document.getElementById('sel-anio').value = anioDef;
+
+  // Cargar config guardada
+  cargarConfigHostal();
+
+  // Listeners para totales de sección B
+  ['b-hab-unidades','b-hab-plazas','b-cab-unidades','b-cab-plazas',
+   'b-dep-unidades','b-dep-plazas','b-camp-unidades','b-camp-plazas'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', actualizarTotalesCapacidad);
+  });
+
+  // Actualizar encabezado de impresión con valores default
+  const nombreMes = MESES[mesDef - 1];
+  document.getElementById('print-periodo').textContent = 'Período: ' + nombreMes + ' ' + anioDef;
+  document.getElementById('print-fecha-emision').textContent = 'Fecha de emisión: ' + new Date().toLocaleDateString('es-CL', {day:'2-digit', month:'long', year:'numeric'});
+
+  // Layout del portal
+  const session = AUTH.getSession();
+  const role    = session?.role || 'owner';
+  const avatarMap = { owner:'👑', staff:'📞' };
+  document.getElementById('sidebar-avatar').textContent = avatarMap[role] || '👤';
+  document.getElementById('sidebar-nav').innerHTML = buildSidebarNav(role, 'emat');
+  initLayout('emat');
+}
+
+document.addEventListener('DOMContentLoaded', initEMAT);
+</script>
+</body>
+</html>

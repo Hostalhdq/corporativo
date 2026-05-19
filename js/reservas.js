@@ -758,7 +758,9 @@ function buildSidebarNav(role, paginaActiva) {
   const menuAdmin = (role === 'owner')
     ? `<div class="nav-section" style="margin-top:12px;">Administración</div>
        <a href="admin.html" class="nav-item${paginaActiva==='admin'?' active':''}" data-page="admin">
-         <span class="nav-icon">🔧</span> Panel Admin</a>`
+         <span class="nav-icon">🔧</span> Panel Admin</a>
+       <a href="emat.html" class="nav-item${paginaActiva==='emat'?' active':''}" data-page="emat">
+         <span class="nav-icon">📋</span> EMAT — INE</a>`
     : '';
 
   const menuWeb = `
