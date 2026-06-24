@@ -424,12 +424,16 @@ if (session) {
      toISOString() daría "mañana" después de las 20:00 local. */
   const _hoy = new Date();
   const today = `${_hoy.getFullYear()}-${String(_hoy.getMonth()+1).padStart(2,'0')}-${String(_hoy.getDate()).padStart(2,'0')}`;
-  document.getElementById('checkin').min  = today;
-  document.getElementById('checkout').min = today;
+
+  /* Solo web tiene restricción de fecha futura; owner/staff pueden registrar fechas pasadas */
+  if (role === 'web') {
+    document.getElementById('checkin').min  = today;
+    document.getElementById('checkout').min = today;
+  }
 
   document.getElementById('checkin').addEventListener('change', function () {
     const co = document.getElementById('checkout');
-    co.min = this.value || today;
+    co.min = this.value || (role === 'web' ? today : '');
     if (co.value && co.value <= this.value) co.value = '';
     actualizarDisponibilidad();   // ← verifica disponibilidad
   });
@@ -591,11 +595,134 @@ if (session) {
     get: () => _clienteIdSeleccionado
   });
 
-  /* ── Submit ── */
+  /* ═══════════════════════════════════════════════
+     MODO EDICIÓN — detecta ?edit=HDQ-xxx en la URL
+     ═══════════════════════════════════════════════ */
+  const _editId = sessionStorage.getItem('hdq_edit_id') || null;
+  if (_editId) sessionStorage.removeItem('hdq_edit_id'); // limpiar para que no persista
+  let _modoEdicion = false;
+
+  if (_editId && (role === 'owner' || role === 'staff')) {
+    const _r = RESERVAS.getAll().find(r => r.id === _editId);
+    if (_r) {
+      _modoEdicion = true;
+      window._editandoReservaId = _editId; // excluye esta reserva del cálculo de disponibilidad
+
+      /* Cambiar títulos y botón */
+      document.getElementById('form-title').textContent = `✏️ Editar Reserva — ${_r.id}`;
+      document.getElementById('form-sub').textContent   = 'Modifica los datos y guarda los cambios.';
+      document.getElementById('btn-submit').innerHTML   = '💾 Guardar Cambios';
+
+      /* Pre-rellenar fechas */
+      document.getElementById('checkin').value  = _r.checkin  || '';
+      document.getElementById('checkout').value = _r.checkout || '';
+
+      /* Pre-seleccionar habitaciones */
+      (_r.habitaciones || []).forEach(h => habitacionesSeleccionadas.add(String(h.numero)));
+
+      /* Pre-rellenar datos del huésped */
+      const _campos = ['huesped_nombre','huesped_rut','huesped_email','huesped_telefono'];
+      _campos.forEach(id => { if (_r[id]) document.getElementById(id).value = _r[id]; });
+      if (_r.huesped_empresa) document.getElementById('empresa_ref').value = _r.huesped_empresa;
+      if (_r.comentarios)     document.getElementById('comentarios').value  = _r.comentarios;
+      if (_r.num_personas)    document.getElementById('num-personas').value = _r.num_personas;
+
+      /* Pre-rellenar descuento */
+      if (_r.descuento) {
+        const dtEl = document.getElementById('descuento-tipo');
+        const dvEl = document.getElementById('descuento-valor');
+        const dmEl = document.getElementById('descuento-motivo');
+        if (dtEl) { dtEl.value = _r.descuento.tipo   || 'porcentaje'; syncDescLabel(); }
+        if (dvEl)   dvEl.value = _r.descuento.valor  || 0;
+        if (dmEl)   dmEl.value = _r.descuento.motivo || '';
+      }
+
+      /* Pre-rellenar desayunos */
+      if (_r.desayunos?.cantidad > 0) {
+        document.getElementById('num-desayunos').value = _r.desayunos.cantidad;
+        const cb = document.getElementById('quiere-desayuno');
+        if (cb) { cb.checked = true; sincDesayunos(); }
+      }
+
+      /* Cliente vinculado */
+      if (_r.cliente_id) {
+        _clienteIdSeleccionado = _r.cliente_id;
+        const cli = CLIENTES.getById(_r.cliente_id);
+        if (cli) {
+          document.getElementById('banner-nombre-cli').textContent = cli.nombre || cli.empresa || 'Cliente';
+          document.getElementById('banner-datos-cli').textContent  = [cli.rut, cli.email, cli.telefono].filter(Boolean).join(' · ');
+          document.getElementById('cliente-vinculado-banner').style.display = 'flex';
+        }
+      }
+
+      /* Cargar disponibilidad con las fechas actuales (excluye esta reserva) */
+      actualizarDisponibilidad();
+      updateTotal();
+    }
+  }
+
+  /* ── Función guardar edición ── */
+  function guardarEdicion(e) {
+    e.preventDefault();
+    clearAlert('form-alert');
+    if (!validateForm()) return;
+
+    const checkin  = document.getElementById('checkin').value;
+    const checkout = document.getElementById('checkout').value;
+    const noches   = calcularNoches(checkin, checkout);
+    const habs     = Array.from(habitacionesSeleccionadas);
+    const numPersonas       = parseInt(document.getElementById('num-personas')?.value) || 1;
+    const numDesayunos      = parseInt(document.getElementById('num-desayunos')?.value) || 0;
+    const subtotalHabs      = habs.reduce((s, n) => s + HABITACIONES[n].precio * noches, 0);
+    const subtotalDesayunos = numDesayunos * PRECIO_DESAYUNO * noches;
+    const subtotalBruto     = subtotalHabs + subtotalDesayunos;
+    const descuento         = getDescuento(subtotalBruto);
+    const total             = subtotalBruto - descuento;
+
+    const updates = {
+      checkin, checkout, noches,
+      num_personas:     numPersonas,
+      habitaciones:     habs.map(num => ({ numero: num, tipo: HABITACIONES[num].tipo, precio: HABITACIONES[num].precio })),
+      huesped_nombre:   document.getElementById('huesped_nombre')?.value.trim()   || '',
+      huesped_rut:      document.getElementById('huesped_rut')?.value.trim()      || '',
+      huesped_email:    document.getElementById('huesped_email')?.value.trim()    || '',
+      huesped_telefono: document.getElementById('huesped_telefono')?.value.trim() || '',
+      huesped_empresa:  document.getElementById('empresa_ref')?.value.trim()      || '',
+      comentarios:      document.getElementById('comentarios')?.value.trim()      || '',
+      cliente_id:       _clienteIdSeleccionado || '',
+      desayunos:   { cantidad: numDesayunos, precio_unit: PRECIO_DESAYUNO, subtotal: subtotalDesayunos },
+      descuento:   {
+        tipo:   document.getElementById('descuento-tipo')?.value  || 'porcentaje',
+        valor:  parseFloat(document.getElementById('descuento-valor')?.value) || 0,
+        monto:  descuento,
+        motivo: document.getElementById('descuento-motivo')?.value.trim() || ''
+      },
+      subtotal_habs:      subtotalHabs,
+      subtotal_desayunos: subtotalDesayunos,
+      subtotal_bruto:     subtotalBruto,
+      descuento_monto:    descuento,
+      total
+    };
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Guardando...';
+
+    RESERVAS.update(_editId, updates);
+
+    setTimeout(() => {
+      window.location.href = 'dashboard.html';
+    }, 600);
+  }
+
+  /* ── Submit (nueva reserva o edición) ── */
   document.getElementById('reserva-form').addEventListener('submit', function (e) {
-    /* Inyectar cliente_id antes de que submitReserva arme el objeto */
     window._clienteIdSeleccionado = _clienteIdSeleccionado;
-    submitReserva(e);
+    if (_modoEdicion) {
+      guardarEdicion(e);
+    } else {
+      submitReserva(e);
+    }
   });
 }
 </script>

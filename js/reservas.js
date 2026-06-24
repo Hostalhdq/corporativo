@@ -33,7 +33,7 @@ function fechasSolapan(ci1, co1, ci2, co2) {
 /* Devuelve un Map: numHab → { estado, id, checkin, checkout }
    para las habitaciones ocupadas en el rango solicitado.
    Consulta Sheets si está configurado, localStorage como fallback. */
-async function getOcupacion(checkin, checkout) {
+async function getOcupacion(checkin, checkout, excludeId = null) {
   if (!checkin || !checkout) return new Map();
 
   let reservas;
@@ -49,7 +49,7 @@ async function getOcupacion(checkin, checkout) {
   const ocupadas = new Map();
 
   reservas
-    .filter(r => r.estado !== 'cancelada')
+    .filter(r => r.estado !== 'cancelada' && (!excludeId || r.id !== excludeId))
     .forEach(r => {
       if (!r.checkin || !r.checkout) return;
       if (fechasSolapan(checkin, checkout, r.checkin, r.checkout)) {
@@ -199,7 +199,7 @@ async function actualizarDisponibilidad() {
       </div>`;
   }
 
-  const ocupadas = await getOcupacion(checkin, checkout);
+  const ocupadas = await getOcupacion(checkin, checkout, window._editandoReservaId || null);
 
   /* Quitar de seleccionadas las que quedaron ocupadas */
   let removidas = [];
@@ -591,6 +591,10 @@ function renderReservasTable(containerId, reservas, opts = {}) {
     const accionesHtml = showActions
       ? `<td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-sm btn-outline"
+               style="padding:4px 8px;font-size:0.78rem;"
+               title="Editar reserva"
+               onclick="editarReserva('${r.id}')">✏️ Editar</button>
             ${r.estado === 'pendiente'
               ? `<button class="btn btn-sm"
                    style="background:var(--success);color:#fff;padding:4px 8px;"
@@ -775,4 +779,13 @@ function buildSidebarNav(role, paginaActiva) {
     <a href="#info-hostal" class="nav-item"><span class="nav-icon">ℹ️</span> Info Hostal</a>`;
 
   return role === 'web' ? menuWeb : menuBase + menuAdmin;
+}
+
+/* ================================================
+   EDICIÓN DE RESERVAS — guarda ID en sessionStorage
+   y navega al formulario de reserva en modo edición
+   ================================================ */
+function editarReserva(id) {
+  sessionStorage.setItem('hdq_edit_id', id);
+  window.location.href = 'reservar.html';
 }
