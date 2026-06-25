@@ -596,14 +596,21 @@ if (session) {
   });
 
   /* ═══════════════════════════════════════════════
-     MODO EDICIÓN — detecta ?edit=HDQ-xxx en la URL
+     MODO EDICIÓN
+     Lee datos completos desde sessionStorage (puestos
+     por editarReserva() en el dashboard). Funciona
+     aunque la reserva no esté en localStorage.
      ═══════════════════════════════════════════════ */
-  const _editId = sessionStorage.getItem('hdq_edit_id') || null;
-  if (_editId) sessionStorage.removeItem('hdq_edit_id'); // limpiar para que no persista
+  const _editId   = sessionStorage.getItem('hdq_edit_id')   || null;
+  const _editData = sessionStorage.getItem('hdq_edit_data') || null;
+  if (_editId)   sessionStorage.removeItem('hdq_edit_id');
+  if (_editData) sessionStorage.removeItem('hdq_edit_data');
   let _modoEdicion = false;
 
   if (_editId && (role === 'owner' || role === 'staff')) {
-    const _r = RESERVAS.getAll().find(r => r.id === _editId);
+    /* Preferir datos completos de sessionStorage; fallback a localStorage */
+    const _r = (_editData ? JSON.parse(_editData) : null)
+            || RESERVAS.getAll().find(r => r.id === _editId);
     if (_r) {
       _modoEdicion = true;
       window._editandoReservaId   = _editId; // excluye esta reserva por ID

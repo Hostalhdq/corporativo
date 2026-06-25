@@ -571,6 +571,10 @@ function renderReservasTable(containerId, reservas, opts = {}) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
+  /* Registrar todas las reservas para que editarReserva() las encuentre
+     aunque no estén en localStorage (ej: vienen de Sheets) */
+  (reservas || []).forEach(r => { if (r.id) _reservasEditables[r.id] = r; });
+
   if (!reservas || reservas.length === 0) {
     container.innerHTML = `
       <div class="no-data">
@@ -785,10 +789,16 @@ function buildSidebarNav(role, paginaActiva) {
 }
 
 /* ================================================
-   EDICIÓN DE RESERVAS — guarda ID en sessionStorage
-   y navega al formulario de reserva en modo edición
+   EDICIÓN DE RESERVAS
+   Guarda los datos completos en sessionStorage para
+   que reservar.html los cargue aunque no estén en
+   localStorage (ej: vienen solo de Sheets).
    ================================================ */
+let _reservasEditables = {};   /* llenado por renderReservasTable */
+
 function editarReserva(id) {
+  const r = _reservasEditables[id];
+  if (r) sessionStorage.setItem('hdq_edit_data', JSON.stringify(r));
   sessionStorage.setItem('hdq_edit_id', id);
   window.location.href = 'reservar.html';
 }
