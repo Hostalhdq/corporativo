@@ -606,7 +606,8 @@ if (session) {
     const _r = RESERVAS.getAll().find(r => r.id === _editId);
     if (_r) {
       _modoEdicion = true;
-      window._editandoReservaId = _editId; // excluye esta reserva del cálculo de disponibilidad
+      window._editandoReservaId   = _editId; // excluye esta reserva por ID
+      window._editandoHabitaciones = new Set((_r.habitaciones || []).map(h => String(h.numero)));
 
       /* Cambiar títulos y botón */
       document.getElementById('form-title').textContent = `✏️ Editar Reserva — ${_r.id}`;

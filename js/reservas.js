@@ -33,7 +33,7 @@ function fechasSolapan(ci1, co1, ci2, co2) {
 /* Devuelve un Map: numHab → { estado, id, checkin, checkout }
    para las habitaciones ocupadas en el rango solicitado.
    Consulta Sheets si está configurado, localStorage como fallback. */
-async function getOcupacion(checkin, checkout, excludeId = null) {
+async function getOcupacion(checkin, checkout, excludeId = null, excludeHabs = null) {
   if (!checkin || !checkout) return new Map();
 
   let reservas;
@@ -54,7 +54,10 @@ async function getOcupacion(checkin, checkout, excludeId = null) {
       if (!r.checkin || !r.checkout) return;
       if (fechasSolapan(checkin, checkout, r.checkin, r.checkout)) {
         (r.habitaciones || []).forEach(h => {
-          ocupadas.set(String(h.numero), {
+          const num = String(h.numero);
+          /* Si es una habitación de la reserva que se está editando, no la bloquea */
+          if (excludeHabs && excludeHabs.has(num)) return;
+          ocupadas.set(num, {
             estado:   r.estado,
             id:       r.id,
             checkin:  r.checkin,
@@ -199,7 +202,7 @@ async function actualizarDisponibilidad() {
       </div>`;
   }
 
-  const ocupadas = await getOcupacion(checkin, checkout, window._editandoReservaId || null);
+  const ocupadas = await getOcupacion(checkin, checkout, window._editandoReservaId || null, window._editandoHabitaciones || null);
 
   /* Quitar de seleccionadas las que quedaron ocupadas */
   let removidas = [];
