@@ -235,6 +235,8 @@ function getAllClientes() {
 
 /* ──────────────────────────────────────────────────
    GUARDAR RESERVA
+   Si el ID ya existe → actualiza la fila (edición).
+   Si no existe      → agrega fila nueva.
    ────────────────────────────────────────────────── */
 function guardarReserva(r) {
   if (!r) return { ok: false, error: 'Datos de reserva vacíos.' };
@@ -273,6 +275,20 @@ function guardarReserva(r) {
     JSON.stringify(r)
   ];
 
+  /* Buscar fila existente por ID — si existe, actualizar en lugar de agregar */
+  const datos = hoja.getDataRange().getValues();
+  for (let i = 1; i < datos.length; i++) {
+    if (String(datos[i][0]) === String(id)) {
+      fila[19] = datos[i][19] || fila[19]; // preservar fecha original de reserva
+      hoja.getRange(i + 1, 1, 1, fila.length).setValues([fila]);
+      const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
+      const bg = colores[r.estado] || '#f0f4f8';
+      hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
+      return { ok: true, accion: 'actualizado', id };
+    }
+  }
+
+  /* Reserva nueva → agregar fila */
   hoja.appendRow(fila);
 
   const ultimaFila = hoja.getLastRow();
@@ -292,7 +308,7 @@ function guardarReserva(r) {
   /* Email a David */
   try { enviarNotificacionEmail(r); } catch(ex) {}
 
-  return { ok: true, id };
+  return { ok: true, accion: 'creado', id };
 }
 
 /* ──────────────────────────────────────────────────
@@ -332,7 +348,12 @@ function getAllReservas() {
     }
   }).filter(r => r.id);
 
-  return { ok: true, reservas };
+  /* Deduplicar por ID conservando el último registro (ediciones anteriores
+     podían dejar filas duplicadas; el último siempre es el más reciente) */
+  const mapaId = {};
+  reservas.forEach(r => { mapaId[r.id] = r; });
+
+  return { ok: true, reservas: Object.values(mapaId) };
 }
 
 /* ──────────────────────────────────────────────────
