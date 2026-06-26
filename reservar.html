@@ -620,7 +620,11 @@ if (session) {
       /* Cambiar títulos y botón */
       document.getElementById('form-title').textContent = `✏️ Editar Reserva — ${_r.id}`;
       document.getElementById('form-sub').textContent   = 'Modifica los datos y guarda los cambios.';
-      document.getElementById('btn-submit').innerHTML   = '💾 Guardar Cambios';
+      const _btnSubmit = document.getElementById('btn-submit');
+      _btnSubmit.innerHTML = '💾 Guardar Cambios';
+      /* Convertir en botón normal (no submit) y llamar guardarEdicion directo */
+      _btnSubmit.type    = 'button';
+      _btnSubmit.onclick = () => guardarEdicion();
 
       /* Pre-rellenar fechas */
       document.getElementById('checkin').value  = _r.checkin  || '';
@@ -671,8 +675,7 @@ if (session) {
   }
 
   /* ── Función guardar edición ── */
-  function guardarEdicion(e) {
-    e.preventDefault();
+  function guardarEdicion() {
     clearAlert('form-alert');
     if (!validateForm()) return;
 
@@ -743,15 +746,10 @@ if (session) {
     }
   }
 
-  /* ── Submit (nueva reserva o edición) ── */
+  /* ── Submit (solo para nueva reserva; edición usa onclick directo en el botón) ── */
   document.getElementById('reserva-form').addEventListener('submit', function (e) {
     window._clienteIdSeleccionado = _clienteIdSeleccionado;
-    /* Usar window._editandoReservaId es más robusto que _modoEdicion (let de bloque) */
-    if (window._editandoReservaId) {
-      guardarEdicion(e);
-    } else {
-      submitReserva(e);
-    }
+    submitReserva(e);
   });
 }
 </script>
