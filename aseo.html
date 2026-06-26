@@ -299,13 +299,13 @@ function renderAseo(reservas) {
   let html = '';
 
   if (grupos.checkout.length) {
-    html += `<div class="seccion-label">🔴 Limpiar ahora — hicieron checkout</div>`;
+    html += `<div class="seccion-label">🔴 Se van — cambio de sábanas</div>`;
     grupos.checkout.forEach(({ num, h, reserva, siguiente }) => {
       const nombre = reserva.huesped_nombre || reserva.cliente || '—';
       const det = siguiente
         ? `Salió: ${nombre} · Entra mañana: ${siguiente.huesped_nombre || siguiente.cliente}`
         : `Salió: ${nombre}`;
-      html += tarjeta('rojo', '🧹', num, h.tipo, det, 'LIMPIAR');
+      html += tarjeta('rojo', '🧹', num, h.tipo, det, 'CAMBIO');
     });
   }
 
@@ -322,7 +322,7 @@ function renderAseo(reservas) {
     grupos.ocupada.forEach(({ num, h, reserva }) => {
       const nombre  = reserva.huesped_nombre || reserva.cliente || '—';
       const hasta   = reserva.checkout ? `hasta el ${reserva.checkout.slice(8)}` : '';
-      html += tarjeta('verde', '🏠', num, h.tipo, `${nombre} · ${hasta}`, 'OCUPADA');
+      html += tarjeta('verde', '🏠', num, h.tipo, `${nombre} · ${hasta}`, 'ASEO');
     });
   }
 
