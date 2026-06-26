@@ -114,9 +114,9 @@
 
 <!-- ══════════ PANTALLA PIN ══════════ -->
 <div id="pin-screen">
-  <div class="pin-logo">🏨</div>
-  <div class="pin-title">Hostal HDQ</div>
-  <div class="pin-sub">Ingresa tu PIN para ver el aseo</div>
+  <div class="pin-logo">🧹</div>
+  <div class="pin-title">¡Hola, señorita Anita!</div>
+  <div class="pin-sub">Ingresa tu PIN para ver las habitaciones</div>
   <div class="pin-dots" id="pin-dots">
     <div class="pin-dot" id="d0"></div>
     <div class="pin-dot" id="d1"></div>
@@ -144,7 +144,7 @@
 <div id="main-view">
   <div class="top-bar">
     <div class="top-bar-info">
-      <div class="hostal">Hostal HDQ</div>
+      <div class="hostal">Hola, señorita Anita 🧹</div>
       <div class="titulo">Aseo del día</div>
       <div class="fecha" id="fecha-hoy"></div>
     </div>
@@ -305,7 +305,7 @@ function renderAseo(reservas) {
       const det = siguiente
         ? `Salió: ${nombre} · Entra mañana: ${siguiente.huesped_nombre || siguiente.cliente}`
         : `Salió: ${nombre}`;
-      html += tarjeta('rojo', '🧹', num, h.tipo, det, 'CAMBIO');
+      html += tarjeta('rojo', '🛏️', num, h.tipo, det, 'CAMBIO');
     });
   }
 
@@ -322,7 +322,7 @@ function renderAseo(reservas) {
     grupos.ocupada.forEach(({ num, h, reserva }) => {
       const nombre  = reserva.huesped_nombre || reserva.cliente || '—';
       const hasta   = reserva.checkout ? `hasta el ${reserva.checkout.slice(8)}` : '';
-      html += tarjeta('verde', '🏠', num, h.tipo, `${nombre} · ${hasta}`, 'ASEO');
+      html += tarjeta('verde', '🧹', num, h.tipo, `${nombre} · ${hasta}`, 'ASEO');
     });
   }
 
