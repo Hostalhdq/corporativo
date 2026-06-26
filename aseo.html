@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Aseo — Hostal HDQ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+    /* ── PIN SCREEN ── */
+    #pin-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .pin-logo { font-size: 48px; margin-bottom: 8px; }
+    .pin-title { font-size: 22px; font-weight: 600; color: #1e3a5f; margin-bottom: 4px; }
+    .pin-sub   { font-size: 14px; color: #6b7280; margin-bottom: 32px; }
+    .pin-dots  { display: flex; gap: 16px; margin-bottom: 32px; }
+    .pin-dot   { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid #94a3b8; background: transparent; transition: background 0.15s; }
+    .pin-dot.filled { background: #1e3a5f; border-color: #1e3a5f; }
+    .pin-dot.error  { background: #e24b4a; border-color: #e24b4a; }
+    .pin-grid { display: grid; grid-template-columns: repeat(3, 80px); gap: 12px; margin-bottom: 16px; }
+    .pin-btn {
+      width: 80px; height: 80px; border-radius: 50%; border: none;
+      background: #fff; font-size: 28px; font-weight: 500; color: #1e3a5f;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12); cursor: pointer; transition: background 0.1s, transform 0.1s;
+    }
+    .pin-btn:active { background: #e2e8f0; transform: scale(0.93); }
+    .pin-btn.del    { font-size: 22px; color: #6b7280; background: #f1f5f9; }
+    .pin-error { font-size: 14px; color: #e24b4a; min-height: 20px; text-align: center; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60%  { transform: translateX(-8px); }
+      40%,80%  { transform: translateX(8px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+
+    /* ── MAIN VIEW ── */
+    #main-view { display: none; }
+    .top-bar {
+      background: #1e3a5f; color: #fff; padding: 20px 16px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .top-bar-info .hostal { font-size: 11px; letter-spacing: 1px; opacity: 0.6; text-transform: uppercase; }
+    .top-bar-info .titulo { font-size: 20px; font-weight: 600; }
+    .top-bar-info .fecha  { font-size: 13px; color: #b5d4f4; margin-top: 2px; }
+    .refresh-btn {
+      background: rgba(255,255,255,.15); border: none; border-radius: 50%;
+      width: 40px; height: 40px; font-size: 20px; cursor: pointer; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .refresh-btn:active { background: rgba(255,255,255,.3); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.7s linear infinite; }
+
+    .content { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+
+    .seccion-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      color: #6b7280; padding: 8px 4px 4px;
+    }
+
+    .hab-card {
+      border-radius: 14px; padding: 16px; display: flex; align-items: center;
+      gap: 14px; cursor: default;
+    }
+    .hab-card.rojo   { background: #fcebeb; border: 1px solid #f7c1c1; }
+    .hab-card.ambar  { background: #faeeda; border: 1px solid #fac775; }
+    .hab-card.verde  { background: #eaf3de; border: 1px solid #c0dd97; }
+    .hab-card.gris   { background: #f1f5f9; border: 1px solid #e2e8f0; }
+
+    .hab-icono {
+      width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 24px;
+    }
+    .rojo  .hab-icono { background: #e24b4a; }
+    .ambar .hab-icono { background: #ba7517; }
+    .verde .hab-icono { background: #3b6d11; }
+    .gris  .hab-icono { background: #94a3b8; }
+
+    .hab-info { flex: 1; }
+    .hab-num  { font-size: 19px; font-weight: 700; }
+    .rojo  .hab-num { color: #a32d2d; }
+    .ambar .hab-num { color: #854f0b; }
+    .verde .hab-num { color: #27500a; }
+    .gris  .hab-num { color: #475569; }
+
+    .hab-det  { font-size: 13px; margin-top: 2px; }
+    .rojo  .hab-det { color: #a32d2d; }
+    .ambar .hab-det { color: #854f0b; }
+    .verde .hab-det { color: #27500a; }
+    .gris  .hab-det { color: #64748b; }
+
+    .hab-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+    }
+    .rojo  .hab-badge { background: #e24b4a; color: #fff; }
+    .ambar .hab-badge { background: #ba7517; color: #fff; }
+    .verde .hab-badge { background: #3b6d11; color: #fff; }
+
+    .actualizado {
+      text-align: center; font-size: 12px; color: #94a3b8; padding: 12px 0 24px;
+    }
+    .cerrar-btn {
+      display: block; margin: 0 auto 24px; background: none; border: 1px solid #cbd5e1;
+      color: #64748b; border-radius: 10px; padding: 10px 28px; font-size: 14px; cursor: pointer;
+    }
+    .loading { text-align: center; padding: 40px 0; font-size: 15px; color: #6b7280; }
+    .empty-msg { text-align: center; padding: 12px; color: #9ca3af; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ PANTALLA PIN ══════════ -->
+<div id="pin-screen">
+  <div class="pin-logo">🏨</div>
+  <div class="pin-title">Hostal HDQ</div>
+  <div class="pin-sub">Ingresa tu PIN para ver el aseo</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-grid">
+    <button class="pin-btn" onclick="pinPresionar('1')">1</button>
+    <button class="pin-btn" onclick="pinPresionar('2')">2</button>
+    <button class="pin-btn" onclick="pinPresionar('3')">3</button>
+    <button class="pin-btn" onclick="pinPresionar('4')">4</button>
+    <button class="pin-btn" onclick="pinPresionar('5')">5</button>
+    <button class="pin-btn" onclick="pinPresionar('6')">6</button>
+    <button class="pin-btn" onclick="pinPresionar('7')">7</button>
+    <button class="pin-btn" onclick="pinPresionar('8')">8</button>
+    <button class="pin-btn" onclick="pinPresionar('9')">9</button>
+    <button class="pin-btn del" onclick="pinBorrar()">⌫</button>
+    <button class="pin-btn" onclick="pinPresionar('0')">0</button>
+    <div></div>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+</div>
+
+<!-- ══════════ VISTA PRINCIPAL ══════════ -->
+<div id="main-view">
+  <div class="top-bar">
+    <div class="top-bar-info">
+      <div class="hostal">Hostal HDQ</div>
+      <div class="titulo">Aseo del día</div>
+      <div class="fecha" id="fecha-hoy"></div>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="cargarDatos()" title="Actualizar">↻</button>
+  </div>
+  <div class="content" id="contenido">
+    <div class="loading">Cargando habitaciones…</div>
+  </div>
+  <div class="actualizado" id="actualizado"></div>
+  <button class="cerrar-btn" onclick="cerrarSesion()">Cerrar sesión</button>
+</div>
+
+<script src="js/sheets.js"></script>
+<script>
+/* ── Configuración ── */
+const PIN_CORRECTO = '2580';   /* ← David puede cambiar este PIN */
+const AUTH_KEY     = 'hdq_aseo_auth';
+const HAB_KEY      = 'hdq_reservas';
+
+const HABS = {
+  '101': { tipo: 'Doble',         piso: 1 },
+  '102': { tipo: 'Cuádruple',     piso: 1 },
+  '103': { tipo: 'Doble 2 Camas', piso: 1 },
+  '201': { tipo: 'Cuádruple',     piso: 2 },
+  '202': { tipo: 'Matrimonial',   piso: 2 },
+  '203': { tipo: 'Matrimonial',   piso: 2 },
+  '204': { tipo: '2 Camas',       piso: 2 },
+  '205': { tipo: 'Triple',        piso: 2 },
+  '206': { tipo: 'Cuádruple',     piso: 2 },
+  '207': { tipo: 'Cuádruple',     piso: 2 }
+};
+
+/* ── Helpers de fecha ── */
+function fechaLocal(offset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+function formatFechaLarga(iso) {
+  const [y, m, d] = iso.split('-');
+  const dias  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fecha = new Date(y, m - 1, d);
+  return `${dias[fecha.getDay()]} ${parseInt(d)} de ${meses[parseInt(m)-1]}`;
+}
+
+/* ── PIN ── */
+let pinActual = '';
+
+function pinPresionar(d) {
+  if (pinActual.length >= 4) return;
+  pinActual += d;
+  actualizarPuntos();
+  if (pinActual.length === 4) verificarPin();
+}
+function pinBorrar() {
+  pinActual = pinActual.slice(0, -1);
+  actualizarPuntos();
+  document.getElementById('pin-error').textContent = '';
+}
+function actualizarPuntos(error = false) {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('d' + i);
+    dot.classList.toggle('filled', i < pinActual.length);
+    dot.classList.toggle('error', error);
+  }
+}
+function verificarPin() {
+  if (pinActual === PIN_CORRECTO) {
+    localStorage.setItem(AUTH_KEY, '1');
+    mostrarVistaPrincipal();
+  } else {
+    actualizarPuntos(true);
+    document.getElementById('pin-dots').classList.add('shake');
+    document.getElementById('pin-error').textContent = 'PIN incorrecto';
+    setTimeout(() => {
+      document.getElementById('pin-dots').classList.remove('shake');
+      pinActual = '';
+      actualizarPuntos();
+    }, 600);
+  }
+}
+function cerrarSesion() {
+  localStorage.removeItem(AUTH_KEY);
+  document.getElementById('main-view').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'flex';
+  pinActual = '';
+  actualizarPuntos();
+}
+
+/* ── Mostrar vista principal ── */
+function mostrarVistaPrincipal() {
+  document.getElementById('pin-screen').style.display  = 'none';
+  document.getElementById('main-view').style.display   = 'block';
+  const hoy = fechaLocal();
+  document.getElementById('fecha-hoy').textContent = formatFechaLarga(hoy);
+  cargarDatos();
+}
+
+/* ── Carga de datos ── */
+async function cargarDatos() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spin');
+
+  let reservas = [];
+  try {
+    if (typeof SHEETS !== 'undefined' && SHEETS.isConfigured()) {
+      const data = await SHEETS.getAll();
+      if (data && Array.isArray(data)) reservas = data;
+    }
+  } catch(e) {}
+
+  if (!reservas.length) {
+    try { reservas = JSON.parse(localStorage.getItem(HAB_KEY) || '[]'); } catch(e) {}
+  }
+
+  btn.classList.remove('spin');
+  renderAseo(reservas);
+  const ahora = new Date();
+  document.getElementById('actualizado').textContent =
+    'Actualizado a las ' + ahora.getHours().toString().padStart(2,'0') + ':' + ahora.getMinutes().toString().padStart(2,'0');
+}
+
+/* ── Lógica de aseo ── */
+function renderAseo(reservas) {
+  const hoy   = fechaLocal(0);
+  const mana  = fechaLocal(1);
+  const activas = reservas.filter(r => r.estado !== 'cancelada');
+
+  const grupos = { checkout: [], preparar: [], ocupada: [], libre: [] };
+
+  Object.keys(HABS).forEach(num => {
+    const relacionadas = activas.filter(r =>
+      (r.habitaciones || []).some(h => String(h.numero) === num)
+    );
+
+    const salidaHoy  = relacionadas.find(r => r.checkout === hoy);
+    const entradaMana = relacionadas.find(r => r.checkin  === mana);
+    const ocupadaAhora = relacionadas.find(r => r.checkin <= hoy && r.checkout > hoy && r.checkout !== hoy);
+
+    if (salidaHoy) {
+      grupos.checkout.push({ num, h: HABS[num], reserva: salidaHoy, siguiente: entradaMana });
+    } else if (entradaMana) {
+      grupos.preparar.push({ num, h: HABS[num], reserva: entradaMana });
+    } else if (ocupadaAhora) {
+      grupos.ocupada.push({ num, h: HABS[num], reserva: ocupadaAhora });
+    } else {
+      grupos.libre.push({ num, h: HABS[num] });
+    }
+  });
+
+  let html = '';
+
+  if (grupos.checkout.length) {
+    html += `<div class="seccion-label">🔴 Limpiar ahora — hicieron checkout</div>`;
+    grupos.checkout.forEach(({ num, h, reserva, siguiente }) => {
+      const nombre = reserva.huesped_nombre || reserva.cliente || '—';
+      const det = siguiente
+        ? `Salió: ${nombre} · Entra mañana: ${siguiente.huesped_nombre || siguiente.cliente}`
+        : `Salió: ${nombre}`;
+      html += tarjeta('rojo', '🧹', num, h.tipo, det, 'LIMPIAR');
+    });
+  }
+
+  if (grupos.preparar.length) {
+    html += `<div class="seccion-label">🟡 Preparar — entra alguien mañana</div>`;
+    grupos.preparar.forEach(({ num, h, reserva }) => {
+      const nombre = reserva.huesped_nombre || reserva.cliente || '—';
+      html += tarjeta('ambar', '🛏️', num, h.tipo, `Entra mañana: ${nombre}`, 'PREPARAR');
+    });
+  }
+
+  if (grupos.ocupada.length) {
+    html += `<div class="seccion-label">🟢 Ocupadas — aseo rápido</div>`;
+    grupos.ocupada.forEach(({ num, h, reserva }) => {
+      const nombre  = reserva.huesped_nombre || reserva.cliente || '—';
+      const hasta   = reserva.checkout ? `hasta el ${reserva.checkout.slice(8)}` : '';
+      html += tarjeta('verde', '🏠', num, h.tipo, `${nombre} · ${hasta}`, 'OCUPADA');
+    });
+  }
+
+  if (grupos.libre.length) {
+    html += `<div class="seccion-label">⚪ Libres</div>`;
+    grupos.libre.forEach(({ num, h }) => {
+      html += tarjeta('gris', '✓', num, h.tipo, 'Sin reserva', '');
+    });
+  }
+
+  if (!html) html = '<div class="empty-msg">No hay reservas activas hoy.</div>';
+
+  document.getElementById('contenido').innerHTML = html;
+}
+
+function tarjeta(color, icon, num, tipo, detalle, badge) {
+  return `
+    <div class="hab-card ${color}">
+      <div class="hab-icono">${icon}</div>
+      <div class="hab-info">
+        <div class="hab-num">Hab. ${num} <span style="font-size:13px;font-weight:400">${tipo}</span></div>
+        <div class="hab-det">${detalle}</div>
+      </div>
+      ${badge ? `<div class="hab-badge">${badge}</div>` : ''}
+    </div>`;
+}
+
+/* ── Inicio ── */
+if (localStorage.getItem(AUTH_KEY) === '1') {
+  mostrarVistaPrincipal();
+}
+</script>
+</body>
+</html>
