@@ -717,28 +717,37 @@ if (session) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Guardando...';
 
-    /* Si la reserva no está en localStorage (vino solo de Sheets),
-       la insertamos con los datos originales antes de actualizar */
-    const _id   = window._editandoReservaId;
-    const _orig = window._editandoReservaData;
-    const existeLocal = RESERVAS.getAll().some(r => r.id === _id);
-    if (!existeLocal && _orig) {
-      const todas = RESERVAS.getAll();
-      todas.push({ ..._orig, id: _id });
-      localStorage.setItem('hdq_reservas', JSON.stringify(todas));
+    try {
+      const _id   = window._editandoReservaId;
+      const _orig = window._editandoReservaData;
+
+      if (!_id) throw new Error('Sin ID de reserva a editar.');
+
+      /* Si la reserva no está en localStorage (vino solo de Sheets),
+         la insertamos con los datos originales antes de actualizar */
+      const existeLocal = RESERVAS.getAll().some(r => r.id === _id);
+      if (!existeLocal && _orig) {
+        const todas = RESERVAS.getAll();
+        todas.push({ ..._orig, id: _id });
+        localStorage.setItem('hdq_reservas', JSON.stringify(todas));
+      }
+
+      RESERVAS.update(_id, updates);
+
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 600);
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = '💾 Guardar Cambios';
+      showAlert('form-alert', 'error', '❌ Error al guardar: ' + err.message);
     }
-
-    RESERVAS.update(_id, updates);
-
-    setTimeout(() => {
-      window.location.href = 'dashboard.html';
-    }, 600);
   }
 
   /* ── Submit (nueva reserva o edición) ── */
   document.getElementById('reserva-form').addEventListener('submit', function (e) {
     window._clienteIdSeleccionado = _clienteIdSeleccionado;
-    if (_modoEdicion) {
+    /* Usar window._editandoReservaId es más robusto que _modoEdicion (let de bloque) */
+    if (window._editandoReservaId) {
       guardarEdicion(e);
     } else {
       submitReserva(e);
