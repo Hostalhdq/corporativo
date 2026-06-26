@@ -613,8 +613,9 @@ if (session) {
             || RESERVAS.getAll().find(r => r.id === _editId);
     if (_r) {
       _modoEdicion = true;
-      window._editandoReservaId   = _editId; // excluye esta reserva por ID
+      window._editandoReservaId    = _editId; // excluye esta reserva por ID
       window._editandoHabitaciones = new Set((_r.habitaciones || []).map(h => String(h.numero)));
+      window._editandoReservaData  = _r;      // datos originales accesibles en guardarEdicion
 
       /* Cambiar títulos y botón */
       document.getElementById('form-title').textContent = `✏️ Editar Reserva — ${_r.id}`;
@@ -716,7 +717,18 @@ if (session) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Guardando...';
 
-    RESERVAS.update(_editId, updates);
+    /* Si la reserva no está en localStorage (vino solo de Sheets),
+       la insertamos con los datos originales antes de actualizar */
+    const _id   = window._editandoReservaId;
+    const _orig = window._editandoReservaData;
+    const existeLocal = RESERVAS.getAll().some(r => r.id === _id);
+    if (!existeLocal && _orig) {
+      const todas = RESERVAS.getAll();
+      todas.push({ ..._orig, id: _id });
+      localStorage.setItem('hdq_reservas', JSON.stringify(todas));
+    }
+
+    RESERVAS.update(_id, updates);
 
     setTimeout(() => {
       window.location.href = 'dashboard.html';
