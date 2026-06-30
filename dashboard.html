@@ -72,6 +72,9 @@
         <!-- Se llena con JS -->
       </div>
 
+      <!-- Panel Hoy -->
+      <div id="panel-hoy" style="margin-bottom:24px;display:none;"></div>
+
       <!-- Reservas -->
       <div class="card" style="margin-bottom:24px;">
         <div class="card-header"
@@ -279,6 +282,69 @@ if (session) {
           <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
           <div class="stat-info"><div class="value">${pctOcup}%</div>
             <div class="label">Ocupación hoy (${habsOcupHoy}/${totalHabs})</div></div></div>`;
+    }
+
+    /* ── Panel de Hoy (solo owner y staff) ────────────── */
+    if (role === 'owner' || role === 'staff') {
+      const hoy  = new Date();
+      const hoyS = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+      const manD = new Date(hoy); manD.setDate(manD.getDate()+1);
+      const manS = `${manD.getFullYear()}-${String(manD.getMonth()+1).padStart(2,'0')}-${String(manD.getDate()).padStart(2,'0')}`;
+
+      const activas = todas.filter(r => r.estado !== 'cancelada');
+      const salenHoy   = activas.filter(r => r.checkout === hoyS);
+      const entranHoy  = activas.filter(r => r.checkin  === hoyS);
+      const entranMana = activas.filter(r => r.checkin  === manS);
+
+      function filaHab(r) {
+        const habs  = (r.habitaciones||[]).map(h=>'Hab.'+h.numero).join(', ') || '—';
+        const nombre = r.huesped_nombre || r.cliente || '—';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;
+                  padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.85rem;">
+                  <span style="font-weight:600;">${habs}</span>
+                  <span style="color:var(--text-muted);flex:1;text-align:right;padding-right:8px;">${nombre}</span>
+                </div>`;
+      }
+
+      function bloque(color, bg, border, icon, titulo, lista, badge) {
+        const filas = lista.length
+          ? lista.map(filaHab).join('')
+          : `<p style="color:var(--text-muted);font-size:.85rem;padding:8px 0;">Ninguna</p>`;
+        return `
+          <div style="background:${bg};border:1px solid ${border};border-radius:12px;padding:16px;flex:1;min-width:180px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <span style="font-size:1.4rem;">${icon}</span>
+              <div>
+                <div style="font-weight:700;color:${color};font-size:.9rem;">${titulo}</div>
+                <div style="font-size:1.6rem;font-weight:700;color:${color};line-height:1;">${lista.length}
+                  <span style="font-size:.75rem;font-weight:600;background:${color};color:#fff;
+                    padding:2px 8px;border-radius:20px;vertical-align:middle;">${badge}</span>
+                </div>
+              </div>
+            </div>
+            <div style="border-top:1px solid ${border};padding-top:8px;">${filas}</div>
+          </div>`;
+      }
+
+      const dias   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const meses  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const fechaLabel = `${dias[hoy.getDay()]} ${hoy.getDate()} de ${meses[hoy.getMonth()]}`;
+
+      document.getElementById('panel-hoy').style.display = 'block';
+      document.getElementById('panel-hoy').innerHTML = `
+        <div class="card">
+          <div class="card-header" style="padding-bottom:4px;">
+            <h2>📅 Hoy — ${fechaLabel}</h2>
+            <p style="font-size:.85rem;color:var(--text-muted);">
+              Salen ${salenHoy.length} · Entran ${entranHoy.length} · Mañana llegan ${entranMana.length}
+            </p>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:16px;">
+            ${bloque('#a32d2d','#fcebeb','#f7c1c1','🛏️','Salen hoy',    salenHoy,  'CHECKOUT')}
+            ${bloque('#27500a','#eaf3de','#c0dd97','🔑','Entran hoy',   entranHoy, 'CHECKIN')}
+            ${bloque('#854f0b','#faeeda','#fac775','📅','Entran mañana',entranMana,'MAÑANA')}
+          </div>
+        </div>`;
     }
 
     const fuenteBadge = fuente === 'sheets'
