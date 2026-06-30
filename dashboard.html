@@ -241,11 +241,13 @@ if (session) {
     const hoyStr  = `${_hoy.getFullYear()}-${String(_hoy.getMonth()+1).padStart(2,'0')}-${String(_hoy.getDate()).padStart(2,'0')}`;
     const totalHabs   = Object.keys(HABITACIONES).length;
     const activasHoy  = todas.filter(r => r.estado !== 'cancelada');
-    const habsOcupHoy = new Set(
+    const habsOcupHoy = (() => {
+      const s = new Set();
       activasHoy
         .filter(r => r.checkin <= hoyStr && r.checkout > hoyStr)
-        .flatMap(r => r.habitaciones || [])
-    ).size;
+        .forEach(r => (r.habitaciones || []).forEach(h => s.add(String(h.numero || h))));
+      return s.size;
+    })();
     const pctOcup     = Math.round(habsOcupHoy / totalHabs * 100);
     const salenHoyCount = activasHoy.filter(r => r.checkout === hoyStr).length;
     const ingrHoy       = activasHoy
