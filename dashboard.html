@@ -251,32 +251,8 @@ if (session) {
       .filter(r => r.checkout === hoyStr)
       .reduce((s, r) => s + (r.total || 0), 0);
 
-    if (role === 'owner') {
-      document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card" style="border-left-color:#1abc9c;">
-          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
-          <div class="stat-info">
-            <div class="value">${pctOcup}%</div>
-            <div class="label">Ocupación hoy · ${habsOcupHoy} de ${totalHabs} hab.</div>
-          </div>
-        </div>
-        <div class="stat-card" style="border-left-color:#8e44ad;">
-          <div class="stat-icon" style="background:#f5eef8;">💰</div>
-          <div class="stat-info">
-            <div class="value">${ingrHoy > 0 ? formatCLP(ingrHoy) : '—'}</div>
-            <div class="label">Cobros de hoy · ${salenHoyCount} checkout${salenHoyCount !== 1 ? 's' : ''}</div>
-          </div>
-        </div>`;
-    } else {
-      document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card" style="border-left-color:#1abc9c;">
-          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
-          <div class="stat-info">
-            <div class="value">${pctOcup}%</div>
-            <div class="label">Ocupación hoy · ${habsOcupHoy} de ${totalHabs} hab.</div>
-          </div>
-        </div>`;
-    }
+    /* Stats integrados en panel-hoy — grid queda vacío */
+    document.getElementById('stats-grid').innerHTML = '';
 
     /* ── Panel de Hoy (solo owner y staff) ────────────── */
     if (role === 'owner' || role === 'staff') {
@@ -321,14 +297,34 @@ if (session) {
       const meses  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
       const fechaLabel = `${dias[_hoy.getDay()]} ${_hoy.getDate()} de ${meses[_hoy.getMonth()]}`;
 
+      const statsDerechaHtml = role === 'owner' ? `
+        <div style="display:flex;gap:16px;flex-shrink:0;align-items:center;">
+          <div style="text-align:right;">
+            <div style="font-size:1.5rem;font-weight:700;color:#0f6e56;line-height:1.1;">${pctOcup}%</div>
+            <div style="font-size:.75rem;color:var(--text-muted);">Ocupación · ${habsOcupHoy}/${totalHabs} hab.</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--border,#e2e8f0);"></div>
+          <div style="text-align:right;">
+            <div style="font-size:1.5rem;font-weight:700;color:#6b21a8;line-height:1.1;">${ingrHoy > 0 ? formatCLP(ingrHoy) : '—'}</div>
+            <div style="font-size:.75rem;color:var(--text-muted);">Cobros hoy · ${salenHoyCount} checkout${salenHoyCount !== 1 ? 's' : ''}</div>
+          </div>
+        </div>` : `
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:1.5rem;font-weight:700;color:#0f6e56;line-height:1.1;">${pctOcup}%</div>
+          <div style="font-size:.75rem;color:var(--text-muted);">Ocupación · ${habsOcupHoy}/${totalHabs} hab.</div>
+        </div>`;
+
       document.getElementById('panel-hoy').style.display = 'block';
       document.getElementById('panel-hoy').innerHTML = `
         <div class="card">
-          <div class="card-header" style="padding-bottom:4px;">
-            <h2>📅 Hoy — ${fechaLabel}</h2>
-            <p style="font-size:.85rem;color:var(--text-muted);">
-              Salen ${salenHoy.length} · Entran ${entranHoy.length} · Mañana llegan ${entranMana.length}
-            </p>
+          <div class="card-header" style="padding-bottom:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h2>📅 Hoy — ${fechaLabel}</h2>
+              <p style="font-size:.85rem;color:var(--text-muted);margin-top:2px;">
+                Salen ${salenHoy.length} · Entran ${entranHoy.length} · Mañana llegan ${entranMana.length}
+              </p>
+            </div>
+            ${statsDerechaHtml}
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;padding:16px;">
             ${bloque('#a32d2d','#fcebeb','#f7c1c1','🛏️','Salen hoy',    salenHoy,  'CHECKOUT')}
