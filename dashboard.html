@@ -319,7 +319,7 @@ if (session) {
 
       const dias   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
       const meses  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const fechaLabel = `${dias[hoy.getDay()]} ${hoy.getDate()} de ${meses[hoy.getMonth()]}`;
+      const fechaLabel = `${dias[_hoy.getDay()]} ${_hoy.getDate()} de ${meses[_hoy.getMonth()]}`;
 
       document.getElementById('panel-hoy').style.display = 'block';
       document.getElementById('panel-hoy').innerHTML = `
