@@ -237,66 +237,54 @@ if (session) {
     const ingr = misReservas.filter(r => r.estado !== 'cancelada').reduce((s,r)=>s+(r.total||0),0);
     const noch = misReservas.filter(r => r.estado !== 'cancelada').reduce((s,r)=>s+(r.noches||0),0);
 
-    /* ── Stats: owner ve ingresos, staff solo conteo/ocupación ── */
-    const totalHabs = Object.keys(HABITACIONES).length;
-    const habsOcupHoy = (() => {
-      const hoy = new Date();
-      const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
-      return misReservas.filter(r =>
-        r.estado !== 'cancelada' &&
-        r.checkin <= hoyStr && r.checkout > hoyStr
-      ).reduce((s,r) => s + (r.habitaciones?.length||0), 0);
-    })();
-    const pctOcup = Math.round(habsOcupHoy / totalHabs * 100);
+    /* ── Fecha de hoy como string YYYY-MM-DD ── */
+    const _hoy    = new Date();
+    const hoyStr  = `${_hoy.getFullYear()}-${String(_hoy.getMonth()+1).padStart(2,'0')}-${String(_hoy.getDate()).padStart(2,'0')}`;
+    const totalHabs   = Object.keys(HABITACIONES).length;
+    const activasHoy  = todas.filter(r => r.estado !== 'cancelada');
+    const habsOcupHoy = activasHoy
+      .filter(r => r.checkin <= hoyStr && r.checkout > hoyStr)
+      .reduce((s, r) => s + (r.habitaciones?.length || 0), 0);
+    const pctOcup     = Math.round(habsOcupHoy / totalHabs * 100);
+    const salenHoyCount = activasHoy.filter(r => r.checkout === hoyStr).length;
+    const ingrHoy       = activasHoy
+      .filter(r => r.checkout === hoyStr)
+      .reduce((s, r) => s + (r.total || 0), 0);
 
     if (role === 'owner') {
       document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="stat-icon">📋</div>
-          <div class="stat-info"><div class="value">${misReservas.length}</div><div class="label">Reservas activas</div></div></div>
-        <div class="stat-card" style="border-left-color:var(--warning);">
-          <div class="stat-icon" style="background:#fef9e7;">⏳</div>
-          <div class="stat-info"><div class="value">${pend}</div><div class="label">Pendientes</div></div></div>
-        <div class="stat-card" style="border-left-color:var(--success);">
-          <div class="stat-icon" style="background:#eafaf1;">✅</div>
-          <div class="stat-info"><div class="value">${conf}</div><div class="label">Confirmadas</div></div></div>
+        <div class="stat-card" style="border-left-color:#1abc9c;">
+          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
+          <div class="stat-info">
+            <div class="value">${pctOcup}%</div>
+            <div class="label">Ocupación hoy · ${habsOcupHoy} de ${totalHabs} hab.</div>
+          </div>
+        </div>
         <div class="stat-card" style="border-left-color:#8e44ad;">
           <div class="stat-icon" style="background:#f5eef8;">💰</div>
-          <div class="stat-info"><div class="value">${formatCLP(ingr)}</div>
-            <div class="label">Ingresos Totales</div></div></div>
-        <div class="stat-card" style="border-left-color:#1abc9c;">
-          <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
-          <div class="stat-info"><div class="value">${pctOcup}%</div>
-            <div class="label">Ocupación hoy (${habsOcupHoy}/${totalHabs})</div></div></div>
-        <div class="stat-card" style="border-left-color:#0ea5e9;">
-          <div class="stat-icon" style="background:#f0f9ff;">🌙</div>
-          <div class="stat-info"><div class="value">${noch}</div><div class="label">Noches totales</div></div></div>`;
+          <div class="stat-info">
+            <div class="value">${ingrHoy > 0 ? formatCLP(ingrHoy) : '—'}</div>
+            <div class="label">Cobros de hoy · ${salenHoyCount} checkout${salenHoyCount !== 1 ? 's' : ''}</div>
+          </div>
+        </div>`;
     } else {
-      /* Staff (Nelson): ocupación y conteo — sin montos */
       document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="stat-icon">📋</div>
-          <div class="stat-info"><div class="value">${misReservas.length}</div><div class="label">Reservas activas</div></div></div>
-        <div class="stat-card" style="border-left-color:var(--warning);">
-          <div class="stat-icon" style="background:#fef9e7;">⏳</div>
-          <div class="stat-info"><div class="value">${pend}</div><div class="label">Pendientes</div></div></div>
-        <div class="stat-card" style="border-left-color:var(--success);">
-          <div class="stat-icon" style="background:#eafaf1;">✅</div>
-          <div class="stat-info"><div class="value">${conf}</div><div class="label">Confirmadas</div></div></div>
         <div class="stat-card" style="border-left-color:#1abc9c;">
           <div class="stat-icon" style="background:#e8f8f5;">🏨</div>
-          <div class="stat-info"><div class="value">${pctOcup}%</div>
-            <div class="label">Ocupación hoy (${habsOcupHoy}/${totalHabs})</div></div></div>`;
+          <div class="stat-info">
+            <div class="value">${pctOcup}%</div>
+            <div class="label">Ocupación hoy · ${habsOcupHoy} de ${totalHabs} hab.</div>
+          </div>
+        </div>`;
     }
 
     /* ── Panel de Hoy (solo owner y staff) ────────────── */
     if (role === 'owner' || role === 'staff') {
-      const hoy  = new Date();
-      const hoyS = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
-      const manD = new Date(hoy); manD.setDate(manD.getDate()+1);
+      const manD = new Date(_hoy); manD.setDate(manD.getDate() + 1);
       const manS = `${manD.getFullYear()}-${String(manD.getMonth()+1).padStart(2,'0')}-${String(manD.getDate()).padStart(2,'0')}`;
-
-      const activas = todas.filter(r => r.estado !== 'cancelada');
-      const salenHoy   = activas.filter(r => r.checkout === hoyS);
-      const entranHoy  = activas.filter(r => r.checkin  === hoyS);
+      const activas = activasHoy;
+      const salenHoy   = activas.filter(r => r.checkout === hoyStr);
+      const entranHoy  = activas.filter(r => r.checkin  === hoyStr);
       const entranMana = activas.filter(r => r.checkin  === manS);
 
       function filaHab(r) {
