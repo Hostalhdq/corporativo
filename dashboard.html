@@ -152,24 +152,23 @@ if (session) {
   const avEl = document.getElementById('sidebar-avatar');
   if (avEl) avEl.textContent = avatarMap[role] || '👤';
 
-  /* ── Badge de entorno ────────────────────────── */
-  const entornoCfg = {
-    owner: { color: '#1e3a5f', bg: '#e8f1fb', icon: '👑', label: 'Entorno Dueño — Acceso Total',     desc: 'Ves todas las reservas de todos los orígenes.' },
-    staff: { color: '#6b21a8', bg: '#f5f3ff', icon: '📞', label: 'Entorno Staff — Nelson',            desc: 'Ves tus reservas y las de David. Puedes actualizar estados.' },
-    web:   { color: '#065f46', bg: '#ecfdf5', icon: '🌐', label: 'Entorno Web — Cliente Corporativo', desc: 'Reservas realizadas online desde el portal.' }
-  }[role];
-
-  document.getElementById('entorno-badge').innerHTML = `
-    <div style="display:inline-flex;align-items:center;gap:10px;
-      background:${entornoCfg.bg};border:1px solid ${entornoCfg.color}33;
-      border-radius:8px;padding:10px 16px;">
-      <span style="font-size:1.4rem;">${entornoCfg.icon}</span>
-      <div>
-        <div style="font-weight:700;color:${entornoCfg.color};font-size:0.88rem;">
-          ${entornoCfg.label}</div>
-        <div style="font-size:0.8rem;color:var(--text-muted);">${entornoCfg.desc}</div>
-      </div>
-    </div>`;
+  /* Badge de entorno y banner de conexión: ocultos para owner/staff */
+  if (role === 'web') {
+    const entornoCfg = { color: '#065f46', bg: '#ecfdf5', icon: '🌐', label: 'Entorno Web — Cliente Corporativo', desc: 'Reservas realizadas online desde el portal.' };
+    document.getElementById('entorno-badge').innerHTML = `
+      <div style="display:inline-flex;align-items:center;gap:10px;
+        background:${entornoCfg.bg};border:1px solid ${entornoCfg.color}33;
+        border-radius:8px;padding:10px 16px;">
+        <span style="font-size:1.4rem;">${entornoCfg.icon}</span>
+        <div>
+          <div style="font-weight:700;color:${entornoCfg.color};font-size:0.88rem;">${entornoCfg.label}</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);">${entornoCfg.desc}</div>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById('entorno-badge').style.display  = 'none';
+    document.getElementById('conexion-status').style.display = 'none';
+  }
 
   /* ── Bienvenida ──────────────────────────────── */
   const welcomeMap = {
