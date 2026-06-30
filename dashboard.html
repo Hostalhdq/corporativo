@@ -75,6 +75,9 @@
       <!-- Panel Hoy -->
       <div id="panel-hoy" style="margin-bottom:24px;display:none;"></div>
 
+      <!-- Forecast 7 días -->
+      <div id="panel-forecast" style="margin-bottom:24px;display:none;"></div>
+
       <!-- Reservas -->
       <div class="card" style="margin-bottom:24px;">
         <div class="card-header"
@@ -343,6 +346,64 @@ if (session) {
             ${bloque('#a32d2d','#fcebeb','#f7c1c1','🛏️','Salen hoy',    salenHoy,  'CHECKOUT')}
             ${bloque('#27500a','#eaf3de','#c0dd97','🔑','Entran hoy',   entranHoy, 'CHECKIN')}
             ${bloque('#854f0b','#faeeda','#fac775','📅','Entran mañana',entranMana,'MAÑANA')}
+          </div>
+        </div>`;
+    }
+
+    /* ── Forecast 7 días (solo owner y staff) ─────────── */
+    if (role === 'owner' || role === 'staff') {
+      const TOTAL_HABS = Object.keys(HABITACIONES).length;
+      const activas    = todas.filter(r => r.estado !== 'cancelada');
+      const dias7      = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+      const meses7     = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+      let barras = '';
+      for (let i = 0; i < 7; i++) {
+        const d    = new Date(); d.setDate(d.getDate() + i);
+        const dStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : `${dias7[d.getDay()]} ${d.getDate()}`;
+        const mes   = meses7[d.getMonth()];
+
+        /* Contar habitaciones ocupadas ese día */
+        const habsOcup = new Set();
+        activas.forEach(r => {
+          if (r.checkin <= dStr && r.checkout > dStr) {
+            (r.habitaciones || []).forEach(h => habsOcup.add(String(h.numero)));
+          }
+        });
+        const ocup   = habsOcup.size;
+        const libres = TOTAL_HABS - ocup;
+        const pct    = Math.round(ocup / TOTAL_HABS * 100);
+        const color  = pct >= 90 ? '#e24b4a' : pct >= 60 ? '#ba7517' : '#3b6d11';
+        const bgFill = pct >= 90 ? '#fcebeb' : pct >= 60 ? '#faeeda' : '#eaf3de';
+        const isHoy  = i === 0;
+
+        barras += `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:72px;">
+            <div style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">${mes} ${d.getDate()}</div>
+            <div style="font-size:.82rem;font-weight:${isHoy?'700':'500'};color:${isHoy?'var(--primary)':'var(--text)'};white-space:nowrap;">${label}</div>
+            <div style="width:100%;background:#e5e7eb;border-radius:8px;height:64px;position:relative;overflow:hidden;">
+              <div style="position:absolute;bottom:0;width:100%;height:${pct}%;background:${color};border-radius:8px;transition:height .3s;"></div>
+            </div>
+            <div style="font-size:.8rem;font-weight:700;color:${color};">${ocup}/${TOTAL_HABS}</div>
+            <div style="font-size:.72rem;padding:2px 7px;border-radius:12px;background:${bgFill};color:${color};font-weight:600;white-space:nowrap;">
+              ${libres === 0 ? 'Lleno' : libres === TOTAL_HABS ? 'Libre' : libres + (libres === 1 ? ' libre' : ' libres')}
+            </div>
+          </div>`;
+      }
+
+      document.getElementById('panel-forecast').style.display = 'block';
+      document.getElementById('panel-forecast').innerHTML = `
+        <div class="card">
+          <div class="card-header" style="padding-bottom:8px;">
+            <h2>📊 Próximos 7 días</h2>
+            <p style="font-size:.85rem;color:var(--text-muted);">Ocupación habitaciones · ${TOTAL_HABS} en total</p>
+          </div>
+          <div style="display:flex;gap:8px;padding:16px;overflow-x:auto;">${barras}</div>
+          <div style="display:flex;gap:16px;padding:0 16px 14px;font-size:.76rem;">
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:3px;background:#3b6d11;display:inline-block;"></span>Baja (&lt;60%)</span>
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:3px;background:#ba7517;display:inline-block;"></span>Media (60-89%)</span>
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:3px;background:#e24b4a;display:inline-block;"></span>Alta (≥90%)</span>
           </div>
         </div>`;
     }
