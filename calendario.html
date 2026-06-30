@@ -531,26 +531,9 @@ function renderCalendario(lunes) {
   /* ── Título ── */
   document.getElementById('cal-titulo').textContent = 'Semana del ' + tituloSemana(dias);
 
-  /* ── KPIs ── */
+  /* ── KPIs: ocultos por solicitud del usuario ── */
   const kpiEl = document.getElementById('kpi-semana');
-  kpiEl.style.display = 'grid';
-  /* KPIs: owner ve ingresos, staff solo ocupación */
-  const kpiIngreso = role === 'owner'
-    ? `<div class="kpi-s" style="border-left-color:#10b981;">
-         <div class="kval">${formatCLP(kpis.ingresosSem)}</div>
-         <div class="klbl">💰 Ingresos confirmados</div>
-       </div>`
-    : '';
-  kpiEl.innerHTML = `
-    <div class="kpi-s">
-      <div class="kval">${kpis.tasaSemana}%</div>
-      <div class="klbl">📊 Tasa de ocupación promedio</div>
-    </div>
-    ${kpiIngreso}
-    <div class="kpi-s" style="border-left-color:#f59e0b;">
-      <div class="kval">${kpis.maxOcupadas}/${kpis.totalHabs}</div>
-      <div class="klbl">🏨 Máx. habitaciones en un día</div>
-    </div>`;
+  kpiEl.style.display = 'none';
 
   /* ── Cabecera días ── */
   let thDias = '';
