@@ -275,17 +275,24 @@ function guardarReserva(r) {
     JSON.stringify(r)
   ];
 
-  /* Buscar fila existente por ID — si existe, actualizar en lugar de agregar */
+  /* Buscar TODAS las filas con este ID — actualizar la primera y eliminar el resto */
   const datos = hoja.getDataRange().getValues();
+  const filasConId = [];
   for (let i = 1; i < datos.length; i++) {
-    if (String(datos[i][0]) === String(id)) {
-      fila[19] = datos[i][19] || fila[19]; // preservar fecha original de reserva
-      hoja.getRange(i + 1, 1, 1, fila.length).setValues([fila]);
-      const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
-      const bg = colores[r.estado] || '#f0f4f8';
-      hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
-      return { ok: true, accion: 'actualizado', id };
+    if (String(datos[i][0]) === String(id)) filasConId.push(i);
+  }
+  if (filasConId.length > 0) {
+    const primeraFila = filasConId[0];
+    fila[19] = datos[primeraFila][19] || fila[19]; // preservar fecha original
+    hoja.getRange(primeraFila + 1, 1, 1, fila.length).setValues([fila]);
+    const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
+    const bg = colores[r.estado] || '#f0f4f8';
+    hoja.getRange(primeraFila + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
+    /* Eliminar filas duplicadas de atrás hacia adelante para no desplazar índices */
+    for (let j = filasConId.length - 1; j >= 1; j--) {
+      hoja.deleteRow(filasConId[j] + 1);
     }
+    return { ok: true, accion: 'actualizado', id };
   }
 
   /* Reserva nueva → agregar fila */

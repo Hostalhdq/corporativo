@@ -150,7 +150,12 @@ async function mostrarEstadoConexion(containerId) {
 async function cargarReservasCloud() {
   if (SHEETS.isConfigured()) {
     const data = await SHEETS.getAll();
-    if (data !== null) return { fuente: 'sheets', reservas: data };
+    if (data !== null) {
+      /* Deduplicar por ID en el cliente (el último registro en Sheets gana) */
+      const mapa = {};
+      data.forEach(r => { mapa[r.id] = r; });
+      return { fuente: 'sheets', reservas: Object.values(mapa) };
+    }
   }
   // Fallback: localStorage
   return { fuente: 'local', reservas: RESERVAS.getAll() };
