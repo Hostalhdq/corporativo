@@ -284,6 +284,15 @@ function guardarReserva(r) {
   if (filasConId.length > 0) {
     const primeraFila = filasConId[0];
     fila[19] = datos[primeraFila][19] || fila[19]; // preservar fecha original
+    /* Una edición NO cambia el estado: se conserva el de la hoja.
+       (El navegador puede tener un estado viejo y "revivir" una reserva cancelada.)
+       El estado solo cambia vía updateEstado. */
+    const estadoHoja = String(datos[primeraFila][1] || '');
+    if (estadoHoja) {
+      r.estado = estadoHoja;
+      fila[1]  = estadoHoja;
+      fila[fila.length - 1] = JSON.stringify(r);
+    }
     hoja.getRange(primeraFila + 1, 1, 1, fila.length).setValues([fila]);
     const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
     const bg = colores[r.estado] || '#f0f4f8';
@@ -355,10 +364,11 @@ function getAllReservas() {
     }
   }).filter(r => r.id);
 
-  /* Deduplicar por ID conservando el último registro (ediciones anteriores
-     podían dejar filas duplicadas; el último siempre es el más reciente) */
+  /* Deduplicar por ID conservando la PRIMERA fila: es la que actualizan
+     guardarReserva y updateEstado. (Antes se conservaba la última, y al cancelar
+     una reserva con filas duplicadas la copia vieja seguía ocupando la fecha.) */
   const mapaId = {};
-  reservas.forEach(r => { mapaId[r.id] = r; });
+  reservas.forEach(r => { if (!mapaId[r.id]) mapaId[r.id] = r; });
 
   return { ok: true, reservas: Object.values(mapaId) };
 }
@@ -373,7 +383,11 @@ function getDisponibilidad(checkin, checkout) {
   const datos = hoja.getDataRange().getValues();
   const jsonCol = CABECERAS_RESERVAS.length;
   const ocupadas = [];
+  const vistos = {};
   for (let i = 1; i < datos.length; i++) {
+    const id = String(datos[i][0] || '');
+    if (!id || vistos[id]) continue;   // ignorar filas duplicadas del mismo ID
+    vistos[id] = true;
     const estado = String(datos[i][1] || '');
     if (estado === 'cancelada') continue;
     try {
@@ -398,40 +412,63 @@ function getDisponibilidad(checkin, checkout) {
 function updateEstado(id, estado) {
   if (!id || !estado) return { ok: false, error: 'Parámetros faltantes.' };
 
-  const hoja  = getHojaReservas();
-  const datos = hoja.getDataRange().getValues();
+  const hoja    = getHojaReservas();
+  const datos   = hoja.getDataRange().getValues();
+  const jsonCol = CABECERAS_RESERVAS.length;
 
+  /* Buscar TODAS las filas con este ID (puede haber duplicados antiguos) */
+  const filasConId = [];
   for (let i = 1; i < datos.length; i++) {
-    if (String(datos[i][0]) === String(id)) {
-      hoja.getRange(i + 1, 2).setValue(estado);
+    if (String(datos[i][0]) === String(id)) filasConId.push(i);
+  }
+  if (filasConId.length === 0) return { ok: false, error: 'No se encontró la reserva: ' + id };
 
-      const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
-      const bg = colores[estado];
-      if (bg) hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
+  const i = filasConId[0];
+  hoja.getRange(i + 1, 2).setValue(estado);
 
-      /* Actualizar también el _json con el nuevo estado */
-      const jsonCol = CABECERAS_RESERVAS.length;
-      try {
-        const obj = JSON.parse(datos[i][jsonCol - 1] || '{}');
-        obj.estado = estado;
-        hoja.getRange(i + 1, jsonCol).setValue(JSON.stringify(obj));
-      } catch (e) {}
+  const colores = { pendiente: '#fef9e7', confirmada: '#eafaf1', cancelada: '#fdedec' };
+  const bg = colores[estado];
+  if (bg) hoja.getRange(i + 1, 1, 1, CABECERAS_RESERVAS.length - 1).setBackground(bg);
 
-      /* Email de confirmación al huésped */
-      if (estado === 'confirmada') {
-        try {
-          const objConf = JSON.parse(datos[i][jsonCol - 1] || '{}');
-          objConf.estado = 'confirmada';
-          objConf.id = id;
-          if (objConf.huesped_email) enviarEmailConfirmacion(objConf);
-        } catch(ex) {}
-      }
+  /* Actualizar también el _json con el nuevo estado */
+  let obj = {};
+  try { obj = JSON.parse(datos[i][jsonCol - 1] || '{}'); } catch (e) {}
+  obj.estado = estado;
+  obj.id     = id;
+  hoja.getRange(i + 1, jsonCol).setValue(JSON.stringify(obj));
 
-      return { ok: true };
-    }
+  /* Eliminar filas duplicadas (de atrás hacia adelante) para que ninguna
+     copia vieja siga bloqueando la fecha */
+  for (let j = filasConId.length - 1; j >= 1; j--) {
+    hoja.deleteRow(filasConId[j] + 1);
   }
 
-  return { ok: false, error: 'No se encontró la reserva: ' + id };
+  /* Email de confirmación al huésped */
+  if (estado === 'confirmada' && obj.huesped_email) {
+    try { enviarEmailConfirmacion(obj); } catch(ex) {}
+  }
+
+  return { ok: true, duplicadosEliminados: filasConId.length - 1 };
+}
+
+/* ──────────────────────────────────────────────────
+   LIMPIEZA MANUAL — ejecutar UNA vez desde el editor de Apps Script
+   (seleccionar "limpiarDuplicados" y presionar ▶ Ejecutar).
+   Deja solo la primera fila de cada ID.
+   ────────────────────────────────────────────────── */
+function limpiarDuplicados() {
+  const hoja  = getHojaReservas();
+  const datos = hoja.getDataRange().getValues();
+  const vistos = {};
+  const borrar = [];
+  for (let i = 1; i < datos.length; i++) {
+    const id = String(datos[i][0] || '');
+    if (!id) continue;
+    if (vistos[id]) borrar.push(i + 1); else vistos[id] = true;
+  }
+  for (let j = borrar.length - 1; j >= 0; j--) hoja.deleteRow(borrar[j]);
+  Logger.log('Filas duplicadas eliminadas: ' + borrar.length);
+  return borrar.length;
 }
 
 /* ──────────────────────────────────────────────────

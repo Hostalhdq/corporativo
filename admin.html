@@ -375,10 +375,11 @@
         </div>`;
     }
 
-    window.cambiarEstado = function (id, estado) {
+    window.cambiarEstado = async function (id, estado) {
       const lbl = { confirmada:'confirmar', cancelada:'cancelar', pendiente:'reactivar' };
       if (!confirm(`¿Deseas ${lbl[estado]||estado} la reserva ${id}?`)) return;
       RESERVAS.updateEstado(id, estado);
+      await SHEETS.updateEstado(id, estado);   // antes solo cambiaba en este navegador
       cargarDatos();
     };
 
