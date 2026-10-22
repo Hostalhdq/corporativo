@@ -148,7 +148,8 @@ function badgeOrigen(origen) {
     'Teléfono':        { color: '#1e3a5f', bg: '#e8f1fb', label: '📞 Teléfono' },
     'Teléfono-David':  { color: '#1e3a5f', bg: '#e8f1fb', label: '📞 David' },
     'Teléfono-Nelson': { color: '#6b21a8', bg: '#f5f3ff', label: '📞 Nelson' },
-    'Web':             { color: '#065f46', bg: '#ecfdf5', label: '🌐 Web' }
+    'Web':             { color: '#065f46', bg: '#ecfdf5', label: '🌐 Web' },
+    'Booking':         { color: '#003580', bg: '#e6eefa', label: '🅱️ Booking' }
   };
   const cfg = map[origen] || map['Teléfono'];
   return `<span style="

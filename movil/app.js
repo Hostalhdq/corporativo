@@ -88,7 +88,8 @@
       'Teléfono-David':  ['', '📞 David'],
       'Teléfono-Nelson': ['nelson', '📞 Nelson'],
       'Web':             ['web', '🌐 Web'],
-      'Online':          ['web', '🌐 Online']
+      'Online':          ['web', '🌐 Online'],
+      'Booking':         ['booking', '🅱️ Booking']
     };
     const [c, l] = m[o] || m['Teléfono'];
     return `<span class="badge b-org ${c}">${l}</span>`;
@@ -156,7 +157,7 @@
   function reservasDelRol() {
     const todas = state.reservas;
     if (role() === 'owner') return todas;
-    if (role() === 'staff') return todas.filter(r => ['Teléfono-Nelson','Teléfono-David','Teléfono'].includes(r.origen));
+    if (role() === 'staff') return todas.filter(r => ['Teléfono-Nelson','Teléfono-David','Teléfono','Booking'].includes(r.origen));
     return todas.filter(r => r.origen === 'Web' || !r.origen);
   }
 

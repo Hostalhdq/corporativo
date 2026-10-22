@@ -10,6 +10,21 @@
 const HOJA_RESERVAS  = 'Reservas';
 const HOJA_CLIENTES  = 'Clientes';
 
+/* ──────────────────────────────────────────────────
+   BOOKING.COM — sincronización de calendarios (iCal)
+   Pega aquí el enlace de "Exportar calendario" que te da
+   Booking para cada habitación (entre las comillas).
+   Después ejecuta UNA vez la función configurarBooking.
+   ────────────────────────────────────────────────── */
+const BOOKING_ICAL = {
+  '202': '',
+  '207': ''
+};
+const HABS_BOOKING = {
+  '202': { tipo: 'Matrimonial', precio: 40000 },
+  '207': { tipo: 'Cuádruple',   precio: 80000 }
+};
+
 const CABECERAS_RESERVAS = [
   'ID',
   'Estado',
@@ -60,6 +75,7 @@ function doGet(e) {
     if (action === 'updateEstado')     return resp(updateEstado(e.parameter.id, e.parameter.estado));
     if (action === 'getDisponibilidad') return resp(getDisponibilidad(e.parameter.checkin, e.parameter.checkout));
     if (action === 'ping')             return resp({ ok: true, mensaje: 'Hostal HDQ API activa ✅' });
+    if (action === 'ical')             return icalHabitacion(e.parameter.hab);
 
     return resp({ ok: false, error: 'Acción no reconocida: ' + action });
 
@@ -481,6 +497,173 @@ function eliminarCliente(id) {
     if (String(datos[i][0]) === String(id)) { hoja.deleteRow(i + 1); borradas++; }
   }
   return borradas ? { ok: true, borradas } : { ok: false, error: 'No se encontró el cliente: ' + id };
+}
+
+/* ──────────────────────────────────────────────────
+   BOOKING — EXPORTAR (tu sistema → Booking)
+   ?action=ical&hab=202 devuelve las noches ocupadas de esa
+   habitación. Este enlace se pega en Booking en "Importar
+   calendario". No incluye las reservas que vinieron de Booking
+   (Booking ya las conoce) ni datos de huéspedes: solo fechas.
+   ────────────────────────────────────────────────── */
+function icalHabitacion(hab) {
+  hab = String(hab || '');
+  const reservas = getAllReservas().reservas || [];
+  const ahora = Utilities.formatDate(new Date(), 'UTC', "yyyyMMdd'T'HHmmss'Z'");
+  const lineas = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Hostal HDQ//Reservas//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH'
+  ];
+  reservas.forEach(r => {
+    if (r.estado === 'cancelada' || r.origen === 'Booking') return;
+    if (!(r.habitaciones || []).some(h => String(h.numero) === hab)) return;
+    const ci = String(r.checkin || '').slice(0, 10).replace(/-/g, '');
+    const co = String(r.checkout || '').slice(0, 10).replace(/-/g, '');
+    if (ci.length !== 8 || co.length !== 8 || co <= ci) return;
+    lineas.push(
+      'BEGIN:VEVENT',
+      'UID:' + r.id + '-' + hab + '@hostalhdq',
+      'DTSTAMP:' + ahora,
+      'DTSTART;VALUE=DATE:' + ci,
+      'DTEND;VALUE=DATE:' + co,
+      'SUMMARY:Reservado - Hostal HDQ',
+      'END:VEVENT'
+    );
+  });
+  lineas.push('END:VCALENDAR');
+  return ContentService.createTextOutput(lineas.join('\r\n'))
+    .setMimeType(ContentService.MimeType.ICAL);
+}
+
+/* ──────────────────────────────────────────────────
+   BOOKING — IMPORTAR (Booking → tu sistema)
+   Lee el calendario de Booking de cada habitación y crea,
+   actualiza o cancela las reservas con origen "Booking".
+   Corre sola cada 15 minutos (ver configurarBooking).
+   ────────────────────────────────────────────────── */
+function leerEventosIcal(texto) {
+  /* Une las líneas "dobladas" del formato iCal (las que empiezan con espacio) */
+  const lineas = String(texto || '').replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+  const eventos = [];
+  let ev = null;
+  lineas.forEach(l => {
+    if (l === 'BEGIN:VEVENT') ev = {};
+    else if (l === 'END:VEVENT') { if (ev && ev.inicio && ev.fin) eventos.push(ev); ev = null; }
+    else if (ev) {
+      const i = l.indexOf(':');
+      if (i < 0) return;
+      const clave = l.slice(0, i).split(';')[0].toUpperCase();
+      const valor = l.slice(i + 1).trim();
+      const fecha = v => { const m = v.match(/^(\d{4})(\d{2})(\d{2})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
+      if (clave === 'DTSTART') ev.inicio = fecha(valor);
+      if (clave === 'DTEND')   ev.fin    = fecha(valor);
+      if (clave === 'UID')     ev.uid    = valor;
+      if (clave === 'SUMMARY') ev.resumen = valor;
+    }
+  });
+  return eventos;
+}
+
+function idBooking(hab, ev) {
+  const base = ev.uid || (ev.inicio + ev.fin);
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, hab + '|' + base)
+    .map(b => ((b + 256) % 256).toString(16).padStart(2, '0')).join('').slice(0, 10).toUpperCase();
+  return 'BKG-' + hab + '-' + hash;
+}
+
+function sincronizarBooking() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return { ok: false, error: 'Otra sincronización en curso.' };
+  try {
+    const hoy = Utilities.formatDate(new Date(), 'America/Santiago', 'yyyy-MM-dd');
+    const todas = getAllReservas().reservas || [];
+    const resumen = { creadas: 0, actualizadas: 0, canceladas: 0, errores: [] };
+
+    Object.keys(BOOKING_ICAL).forEach(hab => {
+      const url = String(BOOKING_ICAL[hab] || '').trim();
+      if (!url) return;
+      let eventos;
+      try {
+        const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+        if (res.getResponseCode() !== 200) throw new Error('HTTP ' + res.getResponseCode());
+        eventos = leerEventosIcal(res.getContentText());
+      } catch (err) {
+        resumen.errores.push('Hab. ' + hab + ': ' + err);
+        return;   /* si Booking no responde, no se cancela nada */
+      }
+
+      const deBooking = todas.filter(r => r.origen === 'Booking' &&
+        (r.habitaciones || []).some(h => String(h.numero) === hab));
+      const vistos = {};
+
+      eventos.forEach(ev => {
+        if (ev.fin <= ev.inicio || ev.fin < hoy) return;
+        /* Si es el reflejo de una reserva nuestra (mismas fechas, misma habitación), se ignora */
+        const propia = todas.some(r => r.origen !== 'Booking' && r.estado !== 'cancelada' &&
+          String(r.checkin).slice(0, 10) === ev.inicio && String(r.checkout).slice(0, 10) === ev.fin &&
+          (r.habitaciones || []).some(h => String(h.numero) === hab));
+        if (propia) return;
+
+        const id = idBooking(hab, ev);
+        vistos[id] = true;
+        const existente = deBooking.find(r => r.id === id);
+        const noches = Math.round((new Date(ev.fin) - new Date(ev.inicio)) / 86400000);
+        const info = HABS_BOOKING[hab] || { tipo: '', precio: 0 };
+
+        if (existente && existente.estado !== 'cancelada' &&
+            String(existente.checkin).slice(0, 10) === ev.inicio && String(existente.checkout).slice(0, 10) === ev.fin) return;
+
+        const reserva = Object.assign({}, existente || {}, {
+          id,
+          estado: 'confirmada',
+          origen: 'Booking',
+          registrado_por: 'Booking.com',
+          cliente: 'Booking.com',
+          huesped_nombre: (existente && existente.huesped_nombre) || 'Booking.com',
+          checkin: ev.inicio,
+          checkout: ev.fin,
+          noches,
+          num_personas: (existente && existente.num_personas) || 1,
+          habitaciones: [{ numero: hab, tipo: info.tipo, precio: info.precio }],
+          desayunos: (existente && existente.desayunos) || { cantidad: 0 },
+          total: (existente && existente.total) || 0,
+          comentarios: (existente && existente.comentarios) || 'Reserva de Booking.com — ver detalles y monto en el Extranet.'
+        });
+        guardarReserva(reserva);
+        if (existente && existente.estado === 'cancelada') updateEstado(id, 'confirmada');
+        existente ? resumen.actualizadas++ : resumen.creadas++;
+      });
+
+      /* Las que ya no están en Booking (cancelaciones) se marcan canceladas */
+      deBooking.forEach(r => {
+        if (vistos[r.id] || r.estado === 'cancelada') return;
+        if (String(r.checkout).slice(0, 10) < hoy) return;
+        updateEstado(r.id, 'cancelada');
+        resumen.canceladas++;
+      });
+    });
+
+    Logger.log(JSON.stringify(resumen));
+    return Object.assign({ ok: true }, resumen);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* Ejecutar UNA vez desde el editor (▶ Ejecutar) después de pegar los
+   enlaces de Booking arriba. Crea la tarea automática cada 15 minutos
+   y hace una primera sincronización. */
+function configurarBooking() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'sincronizarBooking')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('sincronizarBooking').timeBased().everyMinutes(15).create();
+  const r = sincronizarBooking();
+  Logger.log('Sincronización con Booking activada: ' + JSON.stringify(r));
+  return r;
 }
 
 /* ──────────────────────────────────────────────────

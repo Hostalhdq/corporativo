@@ -223,7 +223,7 @@ if (session) {
       misReservas = [...todas].reverse();
     } else if (role === 'staff') {
       misReservas = [...todas]
-        .filter(r => ['Teléfono-Nelson','Teléfono-David','Teléfono'].includes(r.origen))
+        .filter(r => ['Teléfono-Nelson','Teléfono-David','Teléfono','Booking'].includes(r.origen))
         .reverse();
     } else {
       misReservas = [...todas].filter(r => r.origen === 'Web' || !r.origen).reverse();
