@@ -79,6 +79,8 @@ function doPost(e) {
     if (action === 'save')          return resp(guardarReserva(body.reserva));
     if (action === 'updateEstado')  return resp(updateEstado(body.id, body.estado));
     if (action === 'saveCliente')   return resp(guardarCliente(body.cliente));
+    if (action === 'deleteReserva') return resp(eliminarReserva(body.id));
+    if (action === 'deleteCliente') return resp(eliminarCliente(body.id));
 
     return resp({ ok: false, error: 'Acción no reconocida: ' + action });
 
@@ -449,6 +451,36 @@ function updateEstado(id, estado) {
   }
 
   return { ok: true, duplicadosEliminados: filasConId.length - 1 };
+}
+
+/* ──────────────────────────────────────────────────
+   ELIMINAR RESERVA — borra todas las filas con ese ID
+   ────────────────────────────────────────────────── */
+function eliminarReserva(id) {
+  if (!id) return { ok: false, error: 'ID requerido.' };
+  const hoja  = getHojaReservas();
+  const datos = hoja.getDataRange().getValues();
+  let borradas = 0;
+  /* De atrás hacia adelante para no desplazar índices */
+  for (let i = datos.length - 1; i >= 1; i--) {
+    if (String(datos[i][0]) === String(id)) { hoja.deleteRow(i + 1); borradas++; }
+  }
+  if (borradas === 0) return { ok: false, error: 'No se encontró la reserva: ' + id };
+  return { ok: true, borradas };
+}
+
+/* ──────────────────────────────────────────────────
+   ELIMINAR CLIENTE
+   ────────────────────────────────────────────────── */
+function eliminarCliente(id) {
+  if (!id) return { ok: false, error: 'ID requerido.' };
+  const hoja  = getHojaClientes();
+  const datos = hoja.getDataRange().getValues();
+  let borradas = 0;
+  for (let i = datos.length - 1; i >= 1; i--) {
+    if (String(datos[i][0]) === String(id)) { hoja.deleteRow(i + 1); borradas++; }
+  }
+  return borradas ? { ok: true, borradas } : { ok: false, error: 'No se encontró el cliente: ' + id };
 }
 
 /* ──────────────────────────────────────────────────

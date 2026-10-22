@@ -75,6 +75,42 @@ const SHEETS = {
     }
   },
 
+  /* ── ELIMINAR RESERVA ──
+     Requiere la versión de Code.gs con la acción 'deleteReserva'. */
+  async deleteReserva(id) {
+    if (!this.isConfigured()) return { ok: false };
+    try {
+      await fetch(SHEETS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({ action: 'deleteReserva', id })
+      });
+      return { ok: true };
+    } catch (err) {
+      console.warn('[Sheets] Error al eliminar reserva:', err);
+      return { ok: false };
+    }
+  },
+
+  /* ── ELIMINAR CLIENTE ──
+     Requiere la versión de Code.gs con la acción 'deleteCliente'. */
+  async deleteCliente(id) {
+    if (!this.isConfigured()) return { ok: false };
+    try {
+      await fetch(SHEETS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({ action: 'deleteCliente', id })
+      });
+      return { ok: true };
+    } catch (err) {
+      console.warn('[Sheets] Error al eliminar cliente:', err);
+      return { ok: false };
+    }
+  },
+
   /* ── GUARDAR CLIENTE ── */
   async saveCliente(cliente) {
     if (!this.isConfigured()) return { ok: false };
@@ -141,6 +177,25 @@ async function mostrarEstadoConexion(containerId) {
         <span><strong>Sin conexión a Sheets.</strong>
         Mostrando datos locales. Verifica tu URL de Apps Script.</span>
        </div>`;
+}
+
+/* ──────────────────────────────────────────────────
+   AUTO-ACTUALIZACIÓN
+   Vuelve a llamar `fn` cada `ms` mientras la pestaña está visible
+   y al volver a ella, para ver lo que otro usuario registró.
+   `puede()` permite saltarse una vuelta (ej: hay un modal abierto).
+   ────────────────────────────────────────────────── */
+function autoActualizar(fn, ms = 60000, puede = () => true) {
+  let ultima = Date.now();
+  const correr = () => {
+    if (document.visibilityState !== 'visible' || !puede()) return;
+    ultima = Date.now();
+    fn();
+  };
+  setInterval(correr, ms);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - ultima > 15000) correr();
+  });
 }
 
 /* ──────────────────────────────────────────────────

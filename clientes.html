@@ -309,6 +309,7 @@ initLayout('clientes');
    ================================================ */
 let _clientesFiltrados = [];
 let _clienteIdActual   = null;
+let _reservasNube      = RESERVAS.getAll();   /* se reemplaza por las de Sheets al cargar */
 
 function buscarClientes() {
   const q = document.getElementById('cli-search').value.trim();
@@ -341,7 +342,7 @@ function renderGrid() {
     const inicial = (c.nombre || c.empresa || '?').charAt(0).toUpperCase();
     const nombre  = c.nombre  || (c.empresa ? c.empresa : '—');
     const empresa = c.empresa && c.empresa !== nombre ? c.empresa : '';
-    const reservasVinc = RESERVAS.getAll().filter(r => r.cliente_id === c.id).length;
+    const reservasVinc = _reservasNube.filter(r => r.cliente_id === c.id).length;
     return `
       <div class="cli-card" onclick="abrirFicha('${c.id}')">
         <div class="cli-card-avatar">${inicial}</div>
@@ -387,7 +388,7 @@ function abrirFicha(id) {
   document.getElementById('cli-btn-eliminar').style.display = 'inline-flex';
 
   /* Historial de reservas */
-  const reservas = RESERVAS.getAll().filter(r => r.cliente_id === id);
+  const reservas = _reservasNube.filter(r => r.cliente_id === id);
   const histWrap = document.getElementById('panel-historial-wrap');
   const histEl   = document.getElementById('panel-historial');
   if (reservas.length > 0) {
@@ -546,32 +547,16 @@ function eliminarCliente() {
 buscarClientes();
 cargarClientesDesdeSheets();
 
+/* Sheets es la lista oficial: trae altas, cambios y bajas hechas en
+   otro equipo (celular o computador), y las reservas para el historial. */
 async function cargarClientesDesdeSheets() {
-  if (!SHEETS.isConfigured()) return;
-  try {
-    const res  = await fetch(SHEETS_URL + '?action=getClientes', { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data.ok || !Array.isArray(data.clientes)) return;
-    if (data.clientes.length === 0) return;
-
-    /* Fusionar: si un cliente de Sheets no está en local, lo agrega */
-    const locales = CLIENTES.getAll();
-    const idsLocales = new Set(locales.map(c => c.id));
-    let nuevos = 0;
-    data.clientes.forEach(c => {
-      if (!idsLocales.has(c.id)) {
-        const all = CLIENTES.getAll();
-        all.push(c);
-        localStorage.setItem('hdq_clientes', JSON.stringify(all));
-        nuevos++;
-      }
-    });
-    if (nuevos > 0) buscarClientes();
-  } catch(e) {
-    console.warn('[Clientes] No se pudo cargar desde Sheets:', e);
-  }
+  const [, cloud] = await Promise.all([CLIENTES.syncFromCloud(), cargarReservasCloud()]);
+  _reservasNube = cloud.reservas || _reservasNube;
+  buscarClientes();
 }
+
+autoActualizar(cargarClientesDesdeSheets, 60000,
+  () => !document.getElementById('cli-panel').classList.contains('visible'));
 </script>
 </body>
 </html>
