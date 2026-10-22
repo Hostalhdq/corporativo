@@ -1179,19 +1179,17 @@
         const n = calcularNoches(x.r.checkin, x.r.checkout);
         const noche = calcularNoches(x.r.checkin, dia) + 1;
         return `
-          <button class="dtile ${x.est}" ${x.propia ? `data-res="${esc(x.r.id)}"` : ''}>
-            <div class="dt-top"><b>${x.n}</b><span class="dt-pill">${x.est === 'pend' ? 'Pendiente' : 'Ocupada'}</span></div>
+          <button class="dtile ocup${x.est === 'pend' ? ' pend' : ''}" ${x.propia ? `data-res="${esc(x.r.id)}"` : ''}>
+            <div class="dt-top"><b>${x.n}</b><span class="dt-pill">${x.est === 'pend' ? 'Por confirmar' : 'Ocupada'}</span></div>
             <div class="dt-guest">${x.propia ? esc(nombreRes(x.r)) : 'Reservada'}</div>
-            <div class="dt-sub">${llega ? '🛬 Llega hoy' : `Noche ${noche} de ${n}`} · sale ${fechaCorta(x.r.checkout)}</div>
-            ${x.sale && x.sale.id !== x.r.id ? `<div class="dt-sub">🧳 Antes sale ${isInternal() ? esc(nombreRes(x.sale)) : 'otro huésped'}</div>` : ''}
+            <div class="dt-sub">${llega ? '🛬 Llega hoy' : `Noche ${noche}/${n}`} · sale ${fechaCorta(x.r.checkout)}</div>
           </button>`;
       }
       return `
         <button class="dtile libre" ${puedeReservar ? `data-libre="${x.n}"` : ''}>
           <div class="dt-top"><b>${x.n}</b><span class="dt-pill">Libre</span></div>
-          <div class="dt-tipo">${esc(hab.tipo)} · ${formatCLP(hab.precio)}</div>
-          ${x.sale ? `<div class="dt-sub">🧳 Sale ${isInternal() ? esc(nombreRes(x.sale)) : 'huésped'} (11:00)</div>` : ''}
-          ${puedeReservar ? `<div class="dt-cta">+ Registrar huésped</div>` : ''}
+          <div class="dt-guest">${esc(hab.tipo)}</div>
+          <div class="dt-sub">${x.sale ? `🧳 Libre desde 11:00` : (puedeReservar ? '+ Registrar huésped' : formatCLP(hab.precio))}</div>
         </button>`;
     };
 
@@ -1219,15 +1217,12 @@
       </div>
       ${dia !== h ? `<button class="btn btn-ghost btn-block" id="cal-hoy" style="min-height:40px;">Volver a hoy</button>` : ''}
       <div class="disp">
-        <span class="libre">🟢 ${nLibres} libre${nLibres === 1 ? '' : 's'}</span>
-        <span class="ocup">🔴 ${nOcup} ocupada${nOcup === 1 ? '' : 's'}</span>
-        ${nPend ? `<span class="pend">🟡 ${nPend} pendiente${nPend === 1 ? '' : 's'}</span>` : ''}
+        <span class="libre">🟩 ${nLibres} libre${nLibres === 1 ? '' : 's'}</span>
+        <span class="ocup">🟨 ${nOcup + nPend} ocupada${nOcup + nPend === 1 ? '' : 's'}${nPend ? ` (${nPend} por confirmar)` : ''}</span>
       </div>
       ${ingresosDia !== null ? `<div class="muted small" style="margin:-6px 2px 0;">Ingresos confirmados de la noche: <b>${formatCLP(ingresosDia)}</b></div>` : ''}
-      ${PISOS.map(p => `
-        <div class="floor">🏠 ${p.label}</div>
-        <div class="dgrid">${p.nums.map(n => tile(info.find(x => x.n === n))).join('')}</div>`).join('')}
-      <p class="muted small" style="text-align:center;">Toca una habitación ocupada para verla o modificarla.</p>
+      <div class="dgrid">${PISOS.flatMap(p => p.nums).map(n => tile(info.find(x => x.n === n))).join('')}</div>
+      <p class="muted small" style="text-align:center;">Verde: libre, toca para registrar · Amarillo: ocupada, toca para ver o modificar</p>
     `;
 
     const mover = d => { state.calDia = d; vistaCalendario(v); };
@@ -1236,7 +1231,7 @@
     if ($('#cal-hoy')) $('#cal-hoy').onclick = () => mover(h);
     $('#cal-fecha').onchange = e => { if (e.target.value) mover(e.target.value); };
     $$('[data-dia]', v).forEach(b => b.onclick = () => mover(b.dataset.dia));
-    $$('[data-res]', v).forEach(b => b.onclick = () => abrirReserva(b.dataset.res));
+    $$('[data-res]', v).forEach(b => b.onclick = () => opcionesOcupada(b.dataset.res, b.querySelector('b').textContent));
     $$('[data-libre]', v).forEach(b => b.onclick = () => {
       W = null;
       irA(`#nueva?ci=${dia}&room=${b.dataset.libre}`);
@@ -1250,6 +1245,28 @@
       const dx = e.changedTouches[0].clientX - t0.x, dy = e.changedTouches[0].clientY - t0.y; t0 = null;
       if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) mover(addDays(dia, dx < 0 ? 1 : -1));
     };
+  }
+
+  /* Menú corto al tocar una habitación ocupada en el calendario */
+  function opcionesOcupada(id, hab) {
+    const r = state.reservas.find(x => x.id === id);
+    if (!r) return;
+    if (!isInternal()) return abrirReserva(id);
+    abrirSheet(`
+      <div class="opc-head">
+        <div class="opc-hab">${esc(hab)}</div>
+        <div style="min-width:0;">
+          <h3>${esc(nombreRes(r))}</h3>
+          <div class="muted small">${fechaCorta(r.checkin)} → ${fechaCorta(r.checkout)} · ${r.noches || calcularNoches(r.checkin, r.checkout)} noche${r.noches === 1 ? '' : 's'} · ${badgeEstado(r.estado)}</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-block btn-lg" id="opc-ver">📋 Ver detalle</button>
+      <button class="btn btn-primary btn-block btn-lg" id="opc-mod">✏️ Modificar reserva</button>
+      <button class="btn btn-outline btn-block" data-close>Cerrar</button>
+    `);
+    $('#opc-ver').onclick = () => abrirReserva(id);
+    $('#opc-mod').onclick = () => abrirModificar(id);
+    $('#sheet-body [data-close]').onclick = () => cerrarSheet();
   }
 
   /* ================================================

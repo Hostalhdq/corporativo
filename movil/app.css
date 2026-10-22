@@ -27,6 +27,12 @@
   --topbar-h:     56px;
   --safe-b:       env(safe-area-inset-bottom, 0px);
   --safe-t:       env(safe-area-inset-top, 0px);
+  --tile-free:    #dcfce7;
+  --tile-free-b:  #22a45a;
+  --tile-free-t:  #14532d;
+  --tile-occ:     #fde68a;
+  --tile-occ-b:   #e0a800;
+  --tile-occ-t:   #5c4300;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,6 +47,12 @@
     --warning-soft: #3a2a0f;
     --danger-soft:  #3b1a17;
     --purple-soft:  #2c1c40;
+    --tile-free:    #14532d;
+    --tile-free-b:  #22a45a;
+    --tile-free-t:  #dcfce7;
+    --tile-occ:     #5c4a0a;
+    --tile-occ-b:   #e0a800;
+    --tile-occ-t:   #fde68a;
     --shadow:       0 1px 3px rgba(0,0,0,.4);
   }
 }
@@ -420,28 +432,31 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .day-nav-lbl input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
 .disp { display: flex; gap: 8px; flex-wrap: wrap; }
 .disp span { font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; }
-.disp .libre { background: var(--success-soft); color: var(--success); }
-.disp .ocup  { background: var(--danger-soft);  color: var(--danger); }
+.disp .libre { background: var(--tile-free); color: var(--tile-free-t); }
+.disp .ocup  { background: var(--tile-occ);  color: var(--tile-occ-t); }
 .disp .pend  { background: var(--warning-soft); color: var(--warning); }
-.dgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .dtile {
-  text-align: left; min-height: 116px; padding: 12px; border-radius: 14px;
-  background: var(--card); box-shadow: var(--shadow); border: 2px solid transparent; border-left-width: 6px;
-  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  text-align: left; min-height: 92px; padding: 10px 12px; border-radius: 14px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px; border: 2px solid transparent;
+  box-shadow: var(--shadow);
 }
-.dtile:active { transform: scale(.98); }
+.dtile:active { transform: scale(.97); }
 .dt-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.dt-top b { font-size: 22px; }
-.dt-pill { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
-.dt-guest { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt-tipo, .dt-sub { font-size: 12.5px; color: var(--muted); }
-.dt-cta { margin-top: auto; font-size: 13px; font-weight: 700; color: var(--success); }
-.dtile.libre { border-left-color: var(--success); }
-.dtile.libre .dt-pill { background: var(--success-soft); color: var(--success); }
-.dtile.ocup  { border-left-color: var(--danger); background: var(--danger-soft); }
-.dtile.ocup  .dt-pill { background: var(--danger); color: #fff; }
-.dtile.pend  { border-left-color: var(--warning); background: var(--warning-soft); }
-.dtile.pend  .dt-pill { background: var(--warning); color: #fff; }
+.dt-top b { font-size: 21px; line-height: 1.1; }
+.dt-pill { font-size: 10.5px; font-weight: 800; padding: 3px 7px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
+.dt-guest { font-weight: 750; font-size: 15px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.dt-sub { font-size: 12px; opacity: .8; margin-top: auto; }
+/* Verde = libre */
+.dtile.libre { background: var(--tile-free); border-color: var(--tile-free-b); color: var(--tile-free-t); }
+.dtile.libre .dt-pill { background: var(--tile-free-b); color: #fff; }
+/* Amarillo = ocupada (borde punteado si está por confirmar) */
+.dtile.ocup { background: var(--tile-occ); border-color: var(--tile-occ-b); color: var(--tile-occ-t); }
+.dtile.ocup .dt-pill { background: var(--tile-occ-t); color: var(--tile-occ); }
+.dtile.ocup.pend { border-style: dashed; }
+.opc-head { display: flex; align-items: center; gap: 14px; }
+.opc-hab { width: 58px; height: 58px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center;
+  font-size: 20px; font-weight: 800; background: var(--tile-occ); color: var(--tile-occ-t); border: 2px solid var(--tile-occ-b); }
 .btn-mod { min-height: 40px; padding: 0 14px; font-size: 14px; flex-shrink: 0; }
 .chip:disabled { opacity: .4; }
 .stepper button:disabled { opacity: .3; }
