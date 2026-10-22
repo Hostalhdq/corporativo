@@ -105,7 +105,7 @@ const AUTH = (() => {
   function isInternal(){ const r = getSession()?.role; return r === 'owner' || r === 'staff'; }
   function isWeb()    { return getSession()?.role === 'web'; }
 
-  return { login, logout, getSession, requireAuth, isOwner, isStaff, isInternal, isWeb };
+  return { login, logout, getSession, requireAuth, redirectIfLoggedIn, isOwner, isStaff, isInternal, isWeb };
 })();
 
 /* ================================================

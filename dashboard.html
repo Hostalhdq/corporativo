@@ -206,8 +206,9 @@ if (session) {
   };
 
   /* ── Renderizado principal (async) ─────────────── */
-  async function renderDashboard() {
-    document.getElementById('reservas-container').innerHTML = `
+  /* silencioso: refresco automático sin mostrar el spinner */
+  async function renderDashboard(silencioso) {
+    if (!silencioso) document.getElementById('reservas-container').innerHTML = `
       <div style="text-align:center;padding:40px;color:var(--text-muted);">
         <div class="spinner" style="border-color:rgba(30,58,95,0.2);
              border-top-color:var(--primary);width:28px;height:28px;
@@ -415,6 +416,9 @@ if (session) {
 
   mostrarEstadoConexion('conexion-status');
   renderDashboard();
+
+  /* Cada minuto trae lo nuevo (ej: reservas hechas desde el celular) */
+  autoActualizar(() => renderDashboard(true));
 
   if (role === 'web') document.getElementById('info-hostal').style.display = 'block';
 }

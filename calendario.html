@@ -669,10 +669,12 @@ function renderCalendario(lunes) {
 /* ================================================
    CARGAR DATOS
    ================================================ */
-async function cargar(lunes) {
-  document.getElementById('cal-loading').style.display = 'block';
-  document.getElementById('cal-wrapper').style.display  = 'none';
-  document.getElementById('kpi-semana').style.display   = 'none';
+async function cargar(lunes, silencioso) {
+  if (!silencioso) {
+    document.getElementById('cal-loading').style.display = 'block';
+    document.getElementById('cal-wrapper').style.display  = 'none';
+    document.getElementById('kpi-semana').style.display   = 'none';
+  }
 
   const { reservas } = await cargarReservasCloud();
   todasReservas = reservas;
@@ -765,6 +767,11 @@ document.getElementById('modal-detalle').addEventListener('click', function(e) {
    INICIO
    ================================================ */
 cargar(lunesActual);
+
+/* Cada minuto trae lo nuevo (ej: reservas hechas desde el celular),
+   salvo que haya un detalle abierto */
+autoActualizar(() => cargar(lunesActual, true),
+  60000, () => !document.getElementById('modal-detalle').classList.contains('show'));
 </script>
 </body>
 </html>

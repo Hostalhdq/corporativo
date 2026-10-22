@@ -729,6 +729,56 @@ const CLIENTES = (() => {
 
   function remove(id) {
     localStorage.setItem(KEY, JSON.stringify(getAll().filter(c => c.id !== id)));
+    if (typeof SHEETS !== 'undefined' && typeof SHEETS.deleteCliente === 'function') {
+      SHEETS.deleteCliente(id).catch(() => {});
+    }
+  }
+
+  /* Toma la lista de Sheets como la oficial, para que altas, cambios y
+     bajas hechas en otro equipo (celular / computador) lleguen a este.
+     - La primera vez en cada equipo sube los clientes que solo existían aquí.
+     - Si un cliente está en ambos lados gana la versión editada más reciente.
+     - Conserva los clientes creados aquí hace menos de 2 minutos que Sheets
+       aún no devuelve (el guardado tarda unos segundos en verse).
+     Devuelve true si la lista cambió. */
+  async function syncFromCloud() {
+    if (typeof SHEETS === 'undefined' || !SHEETS.isConfigured()) return false;
+    try {
+      const res = await fetch(SHEETS_URL + '?action=getClientes', { cache: 'no-store' });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data.ok || !Array.isArray(data.clientes)) return false;
+
+      const locales = getAll();
+      const nube    = data.clientes.filter(c => c && c.id);
+      const idsNube = new Set(nube.map(c => c.id));
+
+      if (localStorage.getItem('hdq_clientes_migrados') !== '1') {
+        locales.filter(c => !idsNube.has(c.id)).forEach(c => {
+          _syncClienteSheets(c);
+          nube.push(c);
+          idsNube.add(c.id);
+        });
+        localStorage.setItem('hdq_clientes_migrados', '1');
+      }
+
+      const marca   = c => new Date(c.fecha_actualizado || c.fecha_registro || 0).getTime() || 0;
+      const limite  = Date.now() - 2 * 60 * 1000;
+      const porId   = new Map(locales.map(c => [c.id, c]));
+      const lista   = nube.map(c => {
+        const local = porId.get(c.id);
+        return local && marca(local) > marca(c) ? local : c;
+      });
+      locales.forEach(c => { if (!idsNube.has(c.id) && marca(c) > limite) lista.push(c); });
+
+      const antes = localStorage.getItem(KEY);
+      const ahora = JSON.stringify(lista);
+      localStorage.setItem(KEY, ahora);
+      return antes !== ahora;
+    } catch (err) {
+      console.warn('[Clientes] No se pudo sincronizar con Sheets:', err);
+      return false;
+    }
   }
 
   /* Buscar por nombre, empresa, RUT o email — devuelve array */
@@ -747,7 +797,7 @@ const CLIENTES = (() => {
     return getAll().find(c => c.id === id) || null;
   }
 
-  return { getAll, save, update, remove, buscar, getById };
+  return { getAll, save, update, remove, buscar, getById, syncFromCloud };
 })();
 
 /* ================================================

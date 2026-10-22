@@ -1272,21 +1272,8 @@
   /* ================================================
      VISTA: CLIENTES
      ================================================ */
-  async function sincronizarClientes() {
-    if (!SHEETS.isConfigured()) return false;
-    try {
-      const res = await fetch(SHEETS_URL + '?action=getClientes', { cache: 'no-store' });
-      if (!res.ok) return false;
-      const data = await res.json();
-      if (!data.ok || !Array.isArray(data.clientes)) return false;
-      const all = CLIENTES.getAll();
-      const ids = new Set(all.map(c => c.id));
-      let nuevos = 0;
-      data.clientes.forEach(c => { if (c.id && !ids.has(c.id)) { all.push(c); nuevos++; } });
-      if (nuevos) localStorage.setItem('hdq_clientes', JSON.stringify(all));
-      return nuevos > 0;
-    } catch { return false; }
-  }
+  /* Altas, cambios y bajas de clientes hechas en el computador (ver CLIENTES.syncFromCloud) */
+  function sincronizarClientes() { return CLIENTES.syncFromCloud(); }
 
   function vistaClientes(v) {
     if (!isInternal()) return irA('#hoy', true);
@@ -1604,13 +1591,14 @@
     render();
   }
 
-  /* Refrescar al volver a la app después de un rato */
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.session && Date.now() - state.cargadoEn > 60000
-        && !location.hash.startsWith('#nueva') && !location.hash.startsWith('#editar') && $('#sheet').hidden) {
-      cargarReservas(true).then(render);
-    }
-  });
+  /* Cada minuto (y al volver a la app) trae lo que se registró en el computador.
+     No refresca mientras se llena una reserva, hay una hoja abierta o se escribe. */
+  autoActualizar(async () => {
+    await Promise.all([cargarReservas(true), sincronizarClientes()]);
+    render();
+  }, 60000, () => state.session && $('#sheet').hidden
+      && !/^#(nueva|editar)/.test(location.hash)
+      && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || ''));
   window.addEventListener('online',  () => { if (state.session) cargarReservas(true).then(render); });
 
   /* Instalación como app (PWA) */
