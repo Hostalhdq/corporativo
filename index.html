@@ -8,7 +8,19 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>" />
   <!-- Verificación temprana: sin parpadeo -->
   <script src="js/auth.js"></script>
-  <script>AUTH.redirectIfLoggedIn();</script>
+  <script>
+    /* En celulares se abre la versión móvil (movil/), salvo que el usuario haya
+       elegido "Versión escritorio" desde ella en esta sesión del navegador. */
+    (function () {
+      var preferDesk = false;
+      try { preferDesk = sessionStorage.getItem('hdq_prefer_desktop') === '1'; } catch (e) {}
+      if (!preferDesk && window.matchMedia('(max-width: 768px) and (pointer: coarse)').matches) {
+        window.location.replace('movil/');
+      } else {
+        AUTH.redirectIfLoggedIn();
+      }
+    })();
+  </script>
 </head>
 <body class="login-page">
 
@@ -76,6 +88,9 @@
     <p>Check-in 15:00 · Check-out 11:00 · davidquiero@gmail.com</p>
     <p style="margin-top:4px;font-size:0.72rem;opacity:0.6;">
       © 2026 Hostal HDQ · Portal privado
+    </p>
+    <p style="margin-top:8px;font-size:0.8rem;">
+      <a href="movil/" style="color:rgba(255,255,255,0.85);">📱 Abrir versión móvil</a>
     </p>
   </div>
 </div>
