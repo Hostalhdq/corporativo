@@ -24,7 +24,6 @@
     cargando:  null,
     filtro:    'proximas',
     busqueda:  '',
-    calLunes:  null,
     calDia:    null,
     cliBusqueda: ''
   };
@@ -270,16 +269,15 @@
         ${r.estado === 'pendiente'  ? `<button class="btn btn-success" data-estado="confirmada">✅ Confirmar</button>` : ''}
         ${r.estado !== 'cancelada' ? `<button class="btn btn-danger"  data-estado="cancelada">Cancelar</button>` : ''}
         ${r.estado === 'cancelada' ? `<button class="btn btn-ghost"   data-estado="pendiente">↩️ Reactivar</button>` : ''}
-      </div>
-      <button class="btn btn-outline btn-block" id="det-editar">✏️ Editar reserva</button>` : '';
+      </div>` : '';
 
     abrirSheet(`
       <div class="res-head">
-        <div>
+        <div style="min-width:0;">
           <h3>${esc(nombreRes(r))}</h3>
-          <div class="muted small">${esc(r.id)}</div>
+          <div class="muted small">${esc(r.id)} · ${badgeEstado(r.estado)}</div>
         </div>
-        ${badgeEstado(r.estado)}
+        ${isInternal() ? `<button class="btn btn-primary btn-mod" id="det-modificar">✏️ Modificar</button>` : ''}
       </div>
       ${contacto}
       <div class="card" style="box-shadow:none;background:var(--bg);">
@@ -308,8 +306,182 @@
       if (await cambiarEstado(r.id, b.dataset.estado)) cerrarSheet(false, render);
     });
     $('#sheet-body [data-close]').onclick = () => cerrarSheet();
-    const ed = $('#det-editar');
-    if (ed) ed.onclick = () => cerrarSheet(false, () => irA('#editar/' + encodeURIComponent(r.id)));
+    const mod = $('#det-modificar');
+    if (mod) mod.onclick = () => abrirModificar(r.id);
+  }
+
+  /* ================================================
+     MODIFICAR RESERVA (sumar/quitar noches, datos, eliminar)
+     ================================================ */
+
+  /* Recalcula montos con una nueva cantidad de noches, respetando
+     precios, desayunos y descuento que ya tenía la reserva */
+  function recalcularReserva(r, noches) {
+    const habs  = r.habitaciones || [];
+    const subtotalHabs = habs.reduce((s, h) =>
+      s + (Number(h.precio) || HABITACIONES[h.numero]?.precio || 0) * noches, 0);
+    const cant  = r.desayunos?.cantidad || 0;
+    const pUnit = r.desayunos?.precio_unit || PRECIO_DESAYUNO;
+    const subtotalDes = cant * pUnit * noches;
+    const bruto = subtotalHabs + subtotalDes;
+    const d = r.descuento || {};
+    let desc = 0;
+    if (d.tipo === 'porcentaje' && d.valor > 0)  desc = Math.round(bruto * Math.min(d.valor, 100) / 100);
+    else if (d.tipo === 'monto' && d.valor > 0)  desc = Math.min(d.valor, bruto);
+    else if ((r.descuento_monto || 0) > 0)       desc = Math.min(r.descuento_monto, bruto);
+    return {
+      noches,
+      desayunos: { ...(r.desayunos || {}), cantidad: cant, precio_unit: pUnit, subtotal: subtotalDes },
+      descuento: { ...d, monto: desc },
+      subtotal_habs: subtotalHabs,
+      subtotal_desayunos: subtotalDes,
+      subtotal_bruto: bruto,
+      descuento_monto: desc,
+      total: bruto - desc
+    };
+  }
+
+  /* Guarda cambios de una reserva existente (local + Sheets), igual que
+     guardarEdicion() de escritorio: si vino solo de Sheets se inserta
+     primero en localStorage para que RESERVAS.update la encuentre. */
+  function guardarReservaEditada(id, orig, cambios) {
+    if (!RESERVAS.getAll().some(x => x.id === id) && orig) {
+      const todas = RESERVAS.getAll();
+      todas.push({ ...orig, id });
+      localStorage.setItem('hdq_reservas', JSON.stringify(todas));
+    }
+    RESERVAS.update(id, cambios);
+    const r = state.reservas.find(x => x.id === id);
+    if (r) Object.assign(r, cambios);
+  }
+
+  /* Primera fecha en que otra reserva ocupa alguna de estas habitaciones
+     después del check-out actual: límite para extender la estadía */
+  function limiteExtension(r) {
+    const nums = new Set((r.habitaciones || []).map(h => String(h.numero)));
+    let lim = null;
+    activas().forEach(o => {
+      if (o.id === r.id || o.checkin < r.checkout) return;
+      const choca = (o.habitaciones || []).find(h => nums.has(String(h.numero)));
+      if (choca && (!lim || o.checkin < lim.fecha)) lim = { fecha: o.checkin, hab: choca.numero, quien: nombreRes(o) };
+    });
+    return lim;
+  }
+
+  async function eliminarReserva(r) {
+    if (!confirm(`¿Eliminar DEFINITIVAMENTE la reserva de ${nombreRes(r)} (${r.id})?\n\nLa habitación queda libre y esto no se puede deshacer.`)) return false;
+    vibrar();
+    RESERVAS.remove(r.id);
+    state.reservas = state.reservas.filter(x => x.id !== r.id);
+    /* Primero se cancela (libera la fecha aunque Code.gs aún no tenga
+       la acción de borrar) y luego se borra la fila de la planilla. */
+    await SHEETS.updateEstado(r.id, 'cancelada');
+    await SHEETS.deleteReserva(r.id);
+    toast('🗑️ Reserva eliminada');
+    return true;
+  }
+
+  function abrirModificar(id) {
+    const r = state.reservas.find(x => x.id === id);
+    if (!r || !isInternal()) return;
+    const M = {
+      noches: calcularNoches(r.checkin, r.checkout) || 1,
+      nombre: r.huesped_nombre || '', tel: r.huesped_telefono || '',
+      email: r.huesped_email || '', rut: r.huesped_rut || '',
+      comentarios: r.comentarios || ''
+    };
+    const lim = limiteExtension(r);
+    const maxNoches = lim ? calcularNoches(r.checkin, lim.fecha) : 60;
+
+    abrirSheet(`
+      <div class="res-head">
+        <div style="min-width:0;">
+          <h3>Modificar reserva</h3>
+          <div class="muted small">${esc(nombreRes(r))} · ${esc(r.id)}</div>
+        </div>
+        <button class="btn btn-outline" id="mod-volver" style="min-height:40px;">‹ Volver</button>
+      </div>
+      <div id="mod-alert"></div>
+
+      <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+        <b>🌙 Noches</b>
+        <div class="stepper">
+          <button type="button" id="mod-menos" aria-label="Quitar un día">−</button>
+          <output id="mod-noches"></output>
+          <button type="button" id="mod-mas" aria-label="Sumar un día">+</button>
+        </div>
+        <div class="chips" style="margin:0;padding:0;">
+          <button type="button" class="chip" data-sumar="1">+1 día</button>
+          <button type="button" class="chip" data-sumar="2">+2 días</button>
+          <button type="button" class="chip" data-sumar="7">+1 semana</button>
+        </div>
+        <div class="summary-line"><span>Check-in</span><b>${fechaCorta(r.checkin)}</b></div>
+        <div class="summary-line"><span>Check-out</span><b id="mod-co"></b></div>
+        <div class="small muted" id="mod-hint"></div>
+        ${verMontos() ? `<div class="summary-line total"><span>Nuevo total</span><span id="mod-total"></span></div>
+          <div class="small muted" style="text-align:right;margin-top:-6px;">Antes: ${formatCLP(r.total)}</div>` : ''}
+      </div>
+
+      <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+        <b>📝 Datos del huésped</b>
+        <label class="field"><span>Nombre</span><input id="mod-nombre" value="${esc(M.nombre)}" autocapitalize="words" /></label>
+        <div class="grid-2">
+          <label class="field"><span>Teléfono</span><input id="mod-tel" type="tel" inputmode="tel" value="${esc(M.tel)}" /></label>
+          <label class="field"><span>RUT</span><input id="mod-rut" value="${esc(M.rut)}" autocapitalize="characters" /></label>
+        </div>
+        <label class="field"><span>Email</span><input id="mod-email" type="email" inputmode="email" autocapitalize="none" value="${esc(M.email)}" /></label>
+        <label class="field"><span>Comentarios</span><textarea id="mod-com" placeholder="Hora de llegada, patente, solicitudes…">${esc(M.comentarios)}</textarea></label>
+      </div>
+
+      <button class="btn btn-primary btn-block btn-lg" id="mod-guardar">💾 Guardar cambios</button>
+      <button class="btn btn-outline btn-block" id="mod-completa">Cambiar habitaciones, desayunos o descuento</button>
+      <button class="btn btn-danger btn-block" id="mod-eliminar">🗑️ Eliminar reserva</button>
+    `);
+
+    const pintar = () => {
+      const co = addDays(r.checkin, M.noches);
+      $('#mod-noches').textContent = `${M.noches} noche${M.noches === 1 ? '' : 's'}`;
+      $('#mod-co').textContent = fechaCorta(co);
+      $('#mod-menos').disabled = M.noches <= 1;
+      $('#mod-mas').disabled = M.noches >= maxNoches;
+      $$('[data-sumar]').forEach(b => { b.disabled = M.noches + Number(b.dataset.sumar) > maxNoches; });
+      const dif = M.noches - (r.noches || calcularNoches(r.checkin, r.checkout));
+      $('#mod-hint').innerHTML = [
+        dif > 0 ? `➕ Suma ${dif} día${dif === 1 ? '' : 's'}` : dif < 0 ? `➖ Quita ${-dif} día${dif === -1 ? '' : 's'}` : '',
+        lim && M.noches >= maxNoches ? `🔒 Hab. ${esc(lim.hab)} está reservada desde el ${fechaCorta(lim.fecha)} (${esc(lim.quien)})` : ''
+      ].filter(Boolean).join('<br>');
+      if ($('#mod-total')) $('#mod-total').textContent = formatCLP(recalcularReserva(r, M.noches).total);
+    };
+    $('#mod-menos').onclick = () => { M.noches = Math.max(1, M.noches - 1); vibrar(); pintar(); };
+    $('#mod-mas').onclick   = () => { M.noches = Math.min(maxNoches, M.noches + 1); vibrar(); pintar(); };
+    $$('[data-sumar]').forEach(b => b.onclick = () => {
+      M.noches = Math.min(maxNoches, M.noches + Number(b.dataset.sumar)); vibrar(); pintar();
+    });
+    pintar();
+
+    const rut = $('#mod-rut');
+    rut.addEventListener('input', () => autoFormatRUT(rut));
+    $('#mod-volver').onclick = () => abrirReserva(r.id);
+
+    $('#mod-guardar').onclick = () => {
+      const datos = {
+        huesped_nombre: $('#mod-nombre').value.trim(), huesped_telefono: $('#mod-tel').value.trim(),
+        huesped_email: $('#mod-email').value.trim(), huesped_rut: $('#mod-rut').value.trim(),
+        comentarios: $('#mod-com').value.trim()
+      };
+      const err = m => { $('#mod-alert').innerHTML = `<div class="alert alert-error">${m}</div>`; $('#sheet-body').scrollTop = 0; };
+      if (datos.huesped_rut && !validarRUT(datos.huesped_rut)) return err('RUT inválido. Verifica el dígito verificador.');
+      if (datos.huesped_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.huesped_email)) return err('Email inválido.');
+      const cambios = { ...datos, checkout: addDays(r.checkin, M.noches), ...recalcularReserva(r, M.noches) };
+      guardarReservaEditada(r.id, r, cambios);
+      vibrar(); toast('💾 Reserva actualizada');
+      abrirReserva(r.id);
+      render();
+    };
+    $('#mod-completa').onclick = () => cerrarSheet(false, () => irA('#editar/' + encodeURIComponent(r.id)));
+    $('#mod-eliminar').onclick = async () => {
+      if (await eliminarReserva(r)) cerrarSheet(false, render);
+    };
   }
 
   /* Tarjeta de reserva reutilizable */
@@ -600,7 +772,7 @@
       if (!W || W.editId !== editId) W = wizardDesdeReserva(r);
     } else if (!W || W.editId || query) {
       W = nuevoWizard(query || {});
-      if (query?.room) W.paso = 2;
+      if (query?.room) W.paso = 3;   /* desde el calendario: directo a registrar al huésped */
       /* Consumir los parámetros para que un re-render no reinicie el asistente */
       if (query) history.replaceState(null, '', '#nueva');
     }
@@ -672,6 +844,10 @@
     if (W.paso === 3) {
       const vinculado = W.clienteId ? CLIENTES.getById(W.clienteId) : null;
       body = `
+        <div class="alert alert-info" style="display:flex;align-items:center;gap:10px;">
+          <span style="flex:1;">🛏️ Hab. ${[...W.rooms].join(', ') || '—'} · ${fechaCorta(W.checkin)} → ${fechaCorta(W.checkout)} (${c.noches} noche${c.noches === 1 ? '' : 's'})</span>
+          <button type="button" class="btn btn-outline" id="wz-cambiar" style="min-height:36px;padding:0 12px;font-size:13px;">Cambiar</button>
+        </div>
         <div class="card" style="display:flex;flex-direction:column;gap:14px;">
           ${vinculado ? `<div class="linked">👤 Cliente: ${esc(vinculado.nombre || vinculado.empresa)}<button type="button" id="wz-unlink">Quitar</button></div>` : ''}
           <label class="field"><span>Nombre del huésped</span>
@@ -853,6 +1029,8 @@
     }
     const rut = $('#wz-rut');
     if (rut) rut.addEventListener('input', () => autoFormatRUT(rut));
+    const camb = $('#wz-cambiar');
+    if (camb) camb.onclick = () => { guardarCamposPaso(); W.paso = 1; pintarWizard(v); window.scrollTo(0, 0); };
     const un = $('#wz-unlink');
     if (un) un.onclick = () => { guardarCamposPaso(); W.clienteId = ''; pintarWizard(v); };
 
@@ -918,16 +1096,7 @@
     const datos = construirReserva();
     try {
       if (W.editId) {
-        /* Igual que guardarEdicion() de escritorio: si la reserva vino solo de Sheets,
-           se inserta en localStorage antes de actualizarla. */
-        if (!RESERVAS.getAll().some(r => r.id === W.editId) && W.orig) {
-          const todas = RESERVAS.getAll();
-          todas.push({ ...W.orig, id: W.editId });
-          localStorage.setItem('hdq_reservas', JSON.stringify(todas));
-        }
-        RESERVAS.update(W.editId, datos);
-        const r = state.reservas.find(x => x.id === W.editId);
-        if (r) Object.assign(r, datos);
+        guardarReservaEditada(W.editId, W.orig, datos);
         const id = W.editId;
         W = null; vibrar();
         toast('💾 Cambios guardados');
@@ -974,61 +1143,71 @@
      VISTA: CALENDARIO (semana + detalle por día)
      ================================================ */
   async function vistaCalendario(v) {
-    setTop('Calendario', '');
-    if (!state.calLunes) state.calLunes = lunesDe(hoy());
-    if (!state.calDia)   state.calDia   = hoy();
+    setTop('Calendario del día', '');
+    if (!state.calDia) state.calDia = hoy();
     v.innerHTML = `<div class="loading">Cargando…</div>`;
     await cargarReservas();
 
     const total = Object.keys(HABITACIONES).length;
-    const dias = [...Array(7)].map((_, i) => addDays(state.calLunes, i));
-    if (!dias.includes(state.calDia)) state.calDia = dias[0];
-    const d1 = parseYmd(dias[0]), d7 = parseYmd(dias[6]);
-    const lbl = d1.getMonth() === d7.getMonth()
-      ? `${d1.getDate()} – ${d7.getDate()} ${MESES[d1.getMonth()]}`
-      : `${d1.getDate()} ${MESES[d1.getMonth()].slice(0,3)} – ${d7.getDate()} ${MESES[d7.getMonth()].slice(0,3)}`;
-
+    const dia = state.calDia;
+    const h = hoy();
+    const lunes = lunesDe(dia);
+    const dias = [...Array(7)].map((_, i) => addDays(lunes, i));
     const act = activas();
     const occDia = dias.map(d => ocupacionNoche(d, act));
-    const dia = state.calDia;
-    const occ = occDia[dias.indexOf(dia)];
-    const h = hoy();
+    const occ = ocupacionNoche(dia, act);
+    setTop('Calendario del día', fechaLarga(dia));
 
-    const filaHab = n => {
-      const hab = HABITACIONES[n];
+    /* Estado de cada habitación en el día elegido */
+    const info = Object.keys(HABITACIONES).map(n => {
       const r = occ.get(n);
-      const sale  = act.find(x => x.checkout === dia && (x.habitaciones || []).some(y => String(y.numero) === n));
+      const sale = act.find(x => x.checkout === dia && (x.habitaciones || []).some(y => String(y.numero) === n));
       const propia = r && (isInternal() || r.origen === 'Web' || !r.origen);
-      let cls = 'free', titulo = 'Libre', sub = `${esc(hab.tipo)} · ${formatCLP(hab.precio)}`, end = '';
-      if (r) {
-        const llega = r.checkin === dia;
-        cls = r.estado === 'pendiente' ? 'pend' : (llega ? 'in' : '');
-        titulo = propia ? esc(nombreRes(r)) : 'Ocupada';
-        sub = `${llega ? '🛬 Llega · ' : ''}hasta ${fechaCorta(r.checkout)}${sale ? ' · 🧳 sale otro' : ''}`;
-        end = r.estado === 'pendiente' ? '<span class="badge b-pend">Pend.</span>' : '<span class="badge b-conf">Conf.</span>';
-      } else if (sale) {
-        cls = 'out'; titulo = 'Libre desde las 11:00';
-        sub = `🧳 Sale ${isInternal() ? esc(nombreRes(sale)) : 'huésped'}`;
+      let est = 'libre';
+      if (r) est = r.estado === 'pendiente' ? 'pend' : 'ocup';
+      return { n, r, sale, propia, est };
+    });
+    const nLibres = info.filter(x => x.est === 'libre').length;
+    const nOcup   = info.filter(x => x.est === 'ocup').length;
+    const nPend   = info.filter(x => x.est === 'pend').length;
+    const puedeReservar = dia >= h || isInternal();
+
+    const tile = x => {
+      const hab = HABITACIONES[x.n];
+      if (x.r) {
+        const llega = x.r.checkin === dia;
+        const n = calcularNoches(x.r.checkin, x.r.checkout);
+        const noche = calcularNoches(x.r.checkin, dia) + 1;
+        return `
+          <button class="dtile ${x.est}" ${x.propia ? `data-res="${esc(x.r.id)}"` : ''}>
+            <div class="dt-top"><b>${x.n}</b><span class="dt-pill">${x.est === 'pend' ? 'Pendiente' : 'Ocupada'}</span></div>
+            <div class="dt-guest">${x.propia ? esc(nombreRes(x.r)) : 'Reservada'}</div>
+            <div class="dt-sub">${llega ? '🛬 Llega hoy' : `Noche ${noche} de ${n}`} · sale ${fechaCorta(x.r.checkout)}</div>
+            ${x.sale && x.sale.id !== x.r.id ? `<div class="dt-sub">🧳 Antes sale ${isInternal() ? esc(nombreRes(x.sale)) : 'otro huésped'}</div>` : ''}
+          </button>`;
       }
-      const attr = r ? (propia ? `data-res="${esc(r.id)}"` : '') : (dia >= h || isInternal() ? `data-libre="${n}"` : '');
       return `
-        <button class="row" ${attr}>
-          <div class="room-num ${cls}">${n}</div>
-          <div class="row-main"><div class="row-title">${titulo}</div><div class="row-sub">${sub}</div></div>
-          ${end}
-          ${!r && attr ? '<span class="badge b-org">+ Reservar</span>' : ''}
+        <button class="dtile libre" ${puedeReservar ? `data-libre="${x.n}"` : ''}>
+          <div class="dt-top"><b>${x.n}</b><span class="dt-pill">Libre</span></div>
+          <div class="dt-tipo">${esc(hab.tipo)} · ${formatCLP(hab.precio)}</div>
+          ${x.sale ? `<div class="dt-sub">🧳 Sale ${isInternal() ? esc(nombreRes(x.sale)) : 'huésped'} (11:00)</div>` : ''}
+          ${puedeReservar ? `<div class="dt-cta">+ Registrar huésped</div>` : ''}
         </button>`;
     };
 
-    const ingresosDia = verMontos() && role() === 'owner'
+    const ingresosDia = role() === 'owner'
       ? [...occ.entries()].filter(([, r]) => r.estado === 'confirmada').reduce((s, [n]) => s + (HABITACIONES[n]?.precio || 0), 0)
       : null;
 
     v.innerHTML = `
-      <div class="week-nav">
-        <button class="btn btn-outline" id="cal-prev" aria-label="Semana anterior">‹</button>
-        <div class="lbl">${lbl}</div>
-        <button class="btn btn-outline" id="cal-next" aria-label="Semana siguiente">›</button>
+      <div class="day-nav">
+        <button class="btn btn-outline" id="cal-prev" aria-label="Día anterior">‹</button>
+        <label class="day-nav-lbl">
+          <b>${fechaLarga(dia)}</b>
+          <span>${dia === h ? 'Hoy' : dia === addDays(h, 1) ? 'Mañana' : dia === addDays(h, -1) ? 'Ayer' : 'Toca para elegir fecha'}</span>
+          <input type="date" id="cal-fecha" value="${dia}" aria-label="Elegir fecha" />
+        </label>
+        <button class="btn btn-outline" id="cal-next" aria-label="Día siguiente">›</button>
       </div>
       <div class="days">
         ${dias.map((d, i) => {
@@ -1038,34 +1217,39 @@
             <div class="dot"><i style="width:${pct}%"></i></div></button>`;
         }).join('')}
       </div>
-      <div class="btn-row">
-        <button class="btn btn-ghost" id="cal-hoy">Hoy</button>
-        <label class="btn btn-outline" style="position:relative;">📅 Ir a fecha
-          <input type="date" id="cal-fecha" value="${dia}" style="position:absolute;inset:0;opacity:0;" /></label>
+      ${dia !== h ? `<button class="btn btn-ghost btn-block" id="cal-hoy" style="min-height:40px;">Volver a hoy</button>` : ''}
+      <div class="disp">
+        <span class="libre">🟢 ${nLibres} libre${nLibres === 1 ? '' : 's'}</span>
+        <span class="ocup">🔴 ${nOcup} ocupada${nOcup === 1 ? '' : 's'}</span>
+        ${nPend ? `<span class="pend">🟡 ${nPend} pendiente${nPend === 1 ? '' : 's'}</span>` : ''}
       </div>
-      <div class="section-title">${fechaLarga(dia)}<span class="count">${occ.size}/${total} ocupadas</span></div>
       ${ingresosDia !== null ? `<div class="muted small" style="margin:-6px 2px 0;">Ingresos confirmados de la noche: <b>${formatCLP(ingresosDia)}</b></div>` : ''}
       ${PISOS.map(p => `
         <div class="floor">🏠 ${p.label}</div>
-        <div class="card-list">${p.nums.map(filaHab).join('')}</div>`).join('')}
-      <div class="legend">
-        <span><i style="background:var(--success)"></i>Llega / confirmada</span>
-        <span><i style="background:var(--warning)"></i>Pendiente</span>
-        <span><i style="background:var(--danger)"></i>Sale</span>
-      </div>
+        <div class="dgrid">${p.nums.map(n => tile(info.find(x => x.n === n))).join('')}</div>`).join('')}
+      <p class="muted small" style="text-align:center;">Toca una habitación ocupada para verla o modificarla.</p>
     `;
 
-    const mover = d => { state.calDia = d; state.calLunes = lunesDe(d); vistaCalendario(v); };
-    $('#cal-prev').onclick = () => mover(addDays(state.calLunes, -7));
-    $('#cal-next').onclick = () => mover(addDays(state.calLunes, 7));
-    $('#cal-hoy').onclick  = () => mover(hoy());
+    const mover = d => { state.calDia = d; vistaCalendario(v); };
+    $('#cal-prev').onclick = () => mover(addDays(dia, -1));
+    $('#cal-next').onclick = () => mover(addDays(dia, 1));
+    if ($('#cal-hoy')) $('#cal-hoy').onclick = () => mover(h);
     $('#cal-fecha').onchange = e => { if (e.target.value) mover(e.target.value); };
-    $$('[data-dia]', v).forEach(b => b.onclick = () => { state.calDia = b.dataset.dia; vistaCalendario(v); });
+    $$('[data-dia]', v).forEach(b => b.onclick = () => mover(b.dataset.dia));
     $$('[data-res]', v).forEach(b => b.onclick = () => abrirReserva(b.dataset.res));
     $$('[data-libre]', v).forEach(b => b.onclick = () => {
       W = null;
       irA(`#nueva?ci=${dia}&room=${b.dataset.libre}`);
     });
+
+    /* Deslizar a los lados cambia de día */
+    let t0 = null;
+    v.ontouchstart = e => { t0 = e.target.closest('.days, input') ? null : e.touches[0]; t0 = t0 && { x: t0.clientX, y: t0.clientY }; };
+    v.ontouchend = e => {
+      if (!t0 || !location.hash.startsWith('#calendario')) return;
+      const dx = e.changedTouches[0].clientX - t0.x, dy = e.changedTouches[0].clientY - t0.y; t0 = null;
+      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) mover(addDays(dia, dx < 0 ? 1 : -1));
+    };
   }
 
   /* ================================================

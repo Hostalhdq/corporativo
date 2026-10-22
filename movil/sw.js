@@ -5,7 +5,7 @@
    Las llamadas a Google Apps Script nunca se cachean.
    ================================================ */
 
-const CACHE = 'hdq-movil-v1';
+const CACHE = 'hdq-movil-v2';
 const SHELL = [
   './', './index.html', './app.css', './app.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png',
