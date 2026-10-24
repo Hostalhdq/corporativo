@@ -639,7 +639,6 @@ $('btnVerHabitaciones').addEventListener('click', async () => {
   state.checkout = co;
   state.noches   = n;
   state.ocupadas = null;
-  state.tipoSel  = null;
   state.personasDesayuno = 0;
 
   // Consultar disponibilidad
@@ -795,7 +794,7 @@ $('btnDejMas').addEventListener('click', () => {
 $('btnVolver1').addEventListener('click', () => showStep(1));
 
 $('btnContinuar2').addEventListener('click', () => {
-  if (!state.tipoSel) return;
+  if (!state.habsSel.length) return;
   updateResumen();
   showStep(3);
 });
